@@ -1,1 +1,2 @@
 # SZEConnect
+Ádika bent xd
