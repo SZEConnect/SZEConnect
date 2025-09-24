@@ -1,8 +1,57 @@
-import React from "react";
+// import React from "react";
+// import LoginPage from "./pages/LoginPage";
+
+// function App() {
+//   return <LoginPage />;
+// }
+
+// export default App;
+
+
+// import RegisterPage from "./pages/RegisterPage";
+// export default function App() { return <RegisterPage />; }
+
+// import { BrowserRouter, Routes, Route } from "react-router-dom";
+// import LoginPage from "./pages/LoginPage";
+// import RegisterPage from "./pages/RegisterPage";
+
+
+
+// function App() {
+//   return (
+//     <BrowserRouter>
+//       <Routes>
+//         {/* Login page at /login */}
+//         <Route path="/login" element={<LoginPage />} />
+
+//         {/* Register page at /register */}
+//         <Route path="/register" element={<RegisterPage />} />
+
+//         {/* Default route: if nothing matches, go to login */}
+//         <Route path="*" element={<LoginPage />} />
+//       </Routes>
+//     </BrowserRouter>
+//   );
+// }
+
+// export default App;
+
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+import InterestsPage from "./pages/InterestsPage";
 
 function App() {
-  return <LoginPage />;
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/interests" element={<InterestsPage />} />
+        <Route path="*" element={<LoginPage />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
 export default App;

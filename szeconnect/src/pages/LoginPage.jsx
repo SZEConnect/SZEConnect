@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 
 // Tailwind is assumed to be set up in the host project.
@@ -13,6 +14,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState({ neptun: "", password: "" });
   const [lang, setLang] = useState("hu");
+  const navigate = useNavigate();
+
 
   const t = (key) => {
     const hu = {
@@ -68,10 +71,15 @@ export default function LoginPage() {
     alert(`${t("login")} OK`);
   };
 
+  // const onRegister = () => {
+  //   // Hook this to your router, e.g., navigate('/register')
+  //   alert(`${t("register")} → route not wired yet`);
+  // };
+
   const onRegister = () => {
-    // Hook this to your router, e.g., navigate('/register')
-    alert(`${t("register")} → route not wired yet`);
+    navigate("/register");
   };
+
 
   return (
     <div className="min-h-screen w-full bg-[#FFF6F2] flex items-center justify-center p-4">
