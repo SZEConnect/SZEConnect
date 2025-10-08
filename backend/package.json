@@ -1,0 +1,38 @@
+{
+  "name": "projektmunka",
+  "version": "1.0.0",
+  "description": "Authentication backend for SzeConnect",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js",
+    "test:register": "node test-registration.js",
+    "test:auth": "node testauth.js",
+    "test:all": "npm run test:register && npm run test:auth",
+    "watch": "nodemon index.js",
+    "dev:watch": "nodemon index.js"
+  },
+  "keywords": [
+    "authentication",
+    "express",
+    "jwt",
+    "bcrypt",
+    "api"
+  ],
+  "author": "Your Name",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.0",
+    "bcrypt": "^5.1.0",
+    "jsonwebtoken": "^9.0.0",
+    "dotenv": "^16.3.0",
+    "cors": "^2.8.5",
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
