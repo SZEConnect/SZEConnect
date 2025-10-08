@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-// import { api } from "../lib/api"; 
+import { api } from "../lib/api"; 
+
 
 export default function RegisterPage() {
   const [lang, setLang] = useState("hu");
@@ -599,25 +600,54 @@ const programs = useMemo(() => {
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!validate()) return;
-    const payload = {
-      username: form.username,
-      name: form.name,
-      neptun: form.neptun.toUpperCase(),
-      program: form.program,
-      studyStartYear: Number(form.startYear),
-      email: form.email.toLowerCase(),
-      password: form.password,
-      bio: form.bio,
-      gender: form.gender,
-      birthYear: form.birthYear ? Number(form.birthYear) : null,
-      acceptedTerms: form.terms,
-    };
-    console.log("REGISTER →", payload);
-    navigate("/interests");
+  // const handleSubmit = (e) => {
+  //   e.preventDefault();
+  //   if (!validate()) return;
+  //   const payload = {
+  //     username: form.username,
+  //     name: form.name,
+  //     neptun: form.neptun.toUpperCase(),
+  //     program: form.program,
+  //     studyStartYear: Number(form.startYear),
+  //     email: form.email.toLowerCase(),
+  //     password: form.password,
+  //     bio: form.bio,
+  //     gender: form.gender,
+  //     birthYear: form.birthYear ? Number(form.birthYear) : null,
+  //     acceptedTerms: form.terms,
+  //   };
+  //   console.log("REGISTER →", payload);
+  //   navigate("/interests");
+  // };
+
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (!validate()) return;
+
+  const payload = {
+    username: form.username.trim(),
+    fullName: form.name?.trim() || undefined,
+    neptun: form.neptun.toUpperCase(),
+    startYear: Number(form.startYear),
+    major: form.program,                 // backend expects 'major'
+    email: form.email.toLowerCase(),
+    password: form.password,
+    passwordAgain: form.confirm,         // backend expects this too
+    bio: form.bio || undefined,
+    gender: form.gender || undefined,
+    birthYear: form.birthYear ? Number(form.birthYear) : undefined,
   };
+
+  try {
+    await api.register(payload);
+    const login = await api.login(payload.neptun, payload.password);
+    localStorage.setItem("token", login.token);
+    navigate("/interests");
+  } catch (err) {
+    alert(err.message);
+  }
+};
+
 
   return (
     <div className="min-h-screen bg-[#FFF6F2]">

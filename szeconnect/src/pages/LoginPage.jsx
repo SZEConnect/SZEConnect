@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-
-
+import { api } from "../lib/api";
 
 // Tailwind is assumed to be set up in the host project.
 // Colors used:
@@ -14,8 +13,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState({ neptun: "", password: "" });
   const [lang, setLang] = useState("hu");
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-
 
   const t = (key) => {
     const hu = {
@@ -28,7 +27,6 @@ export default function LoginPage() {
       or: "vagy",
       forgot: "Elfelejtett jelszó?",
       privacy: "Adatvédelem és Felhasználási feltételek",
-      // terms: "Felhasználási feltételek",
       errors: {
         neptun: "Érvénytelen Neptun-kód (6 karakter, A–Z és számok).",
         password: "A jelszó nem lehet üres.",
@@ -44,7 +42,6 @@ export default function LoginPage() {
       or: "or",
       forgot: "Forgot password?",
       privacy: "Privacy and Terms",
-      // terms: "Terms",
       errors: {
         neptun: "Invalid Neptun code (6 chars, A–Z and digits).",
         password: "Password cannot be empty.",
@@ -62,20 +59,26 @@ export default function LoginPage() {
     return !errs.neptun && !errs.password;
   };
 
-  const onSubmit = (e) => {
+  // ⬇️ REPLACED: now actually calls your backend
+  const onSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
-    // TODO: replace with real API call
-    console.log("LOGIN →", { neptun: neptun.trim().toUpperCase(), password });
-    // Demo: redirect simulate
-    navigate("/home");
+
+    try {
+      setIsLoading(true);
+      const res = await api.login(neptun.trim().toUpperCase(), password);
+      localStorage.setItem("token", res.token);
+      // Optional: keep some basic user info if you want
+      // localStorage.setItem("user", JSON.stringify(res.user));
+      navigate("/home"); // or "/" — your choice
+    } catch (err) {
+      alert(err.message); // e.g. "Invalid credentials"
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const onRegister = () => {
-    navigate("/register");
-  };
-
-
+  const onRegister = () => navigate("/register");
 
   return (
     <div className="min-h-screen w-full bg-[#FFF6F2] flex items-center justify-center p-4">
@@ -107,6 +110,7 @@ export default function LoginPage() {
                 value={neptun}
                 onChange={(e) => setNeptun(e.target.value.toUpperCase())}
                 maxLength={6}
+                disabled={isLoading}
               />
               {errors.neptun && (
                 <p className="mt-2 text-sm text-red-600" role="alert">{errors.neptun}</p>
@@ -130,6 +134,7 @@ export default function LoginPage() {
                 }`}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
               />
               {errors.password && (
                 <p className="mt-2 text-sm text-red-600" role="alert">{errors.password}</p>
@@ -140,15 +145,17 @@ export default function LoginPage() {
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <button
                 type="submit"
-                className="inline-flex items-center justify-center rounded-xl px-6 py-3 text-base font-semibold text-white bg-[#E1860E] hover:opacity-95 active:opacity-90 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#E1860E]/30 shadow-md"
+                disabled={isLoading}
+                className="inline-flex items-center justify-center rounded-xl px-6 py-3 text-base font-semibold text-white bg-[#E1860E] hover:opacity-95 active:opacity-90 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#E1860E]/30 shadow-md disabled:opacity-60"
               >
-                {t("login")}
+                {isLoading ? "…" : t("login")}
               </button>
 
               <button
                 type="button"
                 onClick={onRegister}
-                className="inline-flex items-center justify-center rounded-xl px-6 py-3 text-base font-semibold text-white bg-[#1F3351] hover:bg-[#1A2C45] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#1F3351]/30 shadow-md"
+                disabled={isLoading}
+                className="inline-flex items-center justify-center rounded-xl px-6 py-3 text-base font-semibold text-white bg-[#1F3351] hover:bg-[#1A2C45] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#1F3351]/30 shadow-md disabled:opacity-60"
               >
                 {t("register")}
               </button>
@@ -166,7 +173,6 @@ export default function LoginPage() {
               <div className="flex items-center gap-2">
                 <a href="/info" className="text-[#1F3351]/70 hover:text-[#1F3351]">{t("privacy")}</a>
                 <span aria-hidden>•</span>
-                {/* <a href="#" className="text-[#1F3351]/70 hover:text-[#1F3351]">{t("terms")}</a> */}
               </div>
             </div>
           </form>
@@ -196,8 +202,6 @@ export default function LoginPage() {
 }
 
 function LogoShare({ className = "" }) {
-  // Colors from your Figma: navy #2A3F5B, orange #E28413
-  // Keeps: responsive viewBox + soft drop shadow like the first SVG
   return (
     <svg
       viewBox="0 0 400 400"
@@ -211,33 +215,11 @@ function LogoShare({ className = "" }) {
         </filter>
       </defs>
 
-      {/* Outer ring (stroke only, no fill) */}
-      <circle
-        cx="200"
-        cy="200"
-        r="185"
-        fill="none"
-        stroke="#2A3F5B"
-        strokeWidth="30"
-        filter="url(#softShadow)"
-      />
-
-      {/* Connectors (left→top, left→bottom-right) */}
-      <line
-        x1="120" y1="206"
-        x2="248" y2="125"
-        stroke="#2A3F5B"
-        strokeWidth="26"
-        strokeLinecap="round"
-      />
-      <line
-        x1="120" y1="206"
-        x2="248" y2="279"
-        stroke="#2A3F5B"
-        strokeWidth="26"
-        strokeLinecap="round"
-      />
-
+      {/* Outer ring */}
+      <circle cx="200" cy="200" r="185" fill="none" stroke="#2A3F5B" strokeWidth="30" filter="url(#softShadow)" />
+      {/* Connectors */}
+      <line x1="120" y1="206" x2="248" y2="125" stroke="#2A3F5B" strokeWidth="26" strokeLinecap="round" />
+      <line x1="120" y1="206" x2="248" y2="279" stroke="#2A3F5B" strokeWidth="26" strokeLinecap="round" />
       {/* Nodes */}
       <circle cx="120" cy="206" r="41" fill="#E28413" />
       <circle cx="248" cy="125" r="41" fill="#E28413" />
@@ -245,17 +227,3 @@ function LogoShare({ className = "" }) {
     </svg>
   );
 }
-
-
-{/* <svg xmlns="http://www.w3.org/2000/svg" width="497" height="497" viewBox="0 0 497 497" fill="none">
-<circle cx="248.5" cy="248.5" r="230.5" stroke="#2A3F5B" stroke-width="36"/>
-<line x1="157.349" y1="246.538" x2="315.437" y2="352.448" stroke="#2A3F5B" stroke-width="30"/>
-<line x1="155.491" y1="264.585" x2="311.019" y2="154.949" stroke="#2A3F5B" stroke-width="30"/>
-<ellipse cx="149" cy="256" rx="51" ry="50" fill="#E28413"/>
-<ellipse cx="149" cy="256" rx="51" ry="50" fill="#E28413"/>
-<ellipse cx="308" cy="156" rx="51" ry="50" fill="#E28413"/>
-<ellipse cx="308" cy="156" rx="51" ry="50" fill="#E28413"/>
-<path d="M308 297.5C335.9 297.5 358.5 319.671 358.5 347C358.5 374.329 335.9 396.5 308 396.5C280.1 396.5 257.5 374.329 257.5 347C257.5 319.671 280.1 297.5 308 297.5Z" fill="#E28413"/>
-<path d="M308 297.5C335.9 297.5 358.5 319.671 358.5 347C358.5 374.329 335.9 396.5 308 396.5C280.1 396.5 257.5 374.329 257.5 347C257.5 319.671 280.1 297.5 308 297.5Z" fill="#2A3F5B"/>
-<path d="M308 297.5C335.9 297.5 358.5 319.671 358.5 347C358.5 374.329 335.9 396.5 308 396.5C280.1 396.5 257.5 374.329 257.5 347C257.5 319.671 280.1 297.5 308 297.5Z" stroke="#2A3F5B"/>
-</svg> */}

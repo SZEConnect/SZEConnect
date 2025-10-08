@@ -10,7 +10,12 @@ const cors = require("cors");  // ← ADD THIS LINE
 const app = express();
 
 // ✅ CRITICAL: Add CORS support BEFORE routes
-app.use(cors());
+app.use(
+  cors({
+    origin: ["http://localhost:5173", "http://localhost:3000", "http://localhost:3001"],
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 // Environment variables

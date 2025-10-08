@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { api } from "../lib/api";
+
+{/* Dev link: remove later */}
+<a href="/dev/users" className="underline text-white/90 hover:text-white">Users (dev)</a>
+
 
 // User Profile page (view mode)
-// - Reads :userId from route params (optional); if absent, shows a sample user
-// - Replace MOCK_USER / MOCK_POSTS with real backend calls later
-// - Edit button navigates to `/edit-profile` (change as you like)
+// - Loads current user via GET /profile (JWT required)
+// - Redirects to /login if token missing/invalid
+// - Uses MOCK_POSTS for now (replace with real endpoint later)
 
 export default function UserProfilePage() {
-  const { userId } = useParams();
+  const { userId } = useParams(); // not used yet; backend serves "me"
   const navigate = useNavigate();
   const [lang, setLang] = useState("hu");
   const [loading, setLoading] = useState(true);
@@ -25,6 +30,7 @@ export default function UserProfilePage() {
       edit: "Szerkesztés",
       noBio: "Nincs megadott bio.",
       posts: "Bejegyzések",
+      notFound: "Felhasználó nem található.",
     };
     const en = {
       started: "Start year",
@@ -36,24 +42,59 @@ export default function UserProfilePage() {
       edit: "Edit",
       noBio: "No bio yet.",
       posts: "Posts",
+      notFound: "User not found.",
     };
     return lang === "hu" ? hu : en;
   }, [lang]);
 
   useEffect(() => {
-    // Simulate fetching user & posts
+    const token = localStorage.getItem("token");
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
     setLoading(true);
-    setTimeout(() => {
-      const data = MOCK_USER;
-      const list = MOCK_POSTS;
-      setUser(data);
-      setPosts(list);
-      setLoading(false);
-    }, 300);
-  }, [userId]);
+    (async () => {
+      try {
+        const data = await api.profile(token);
+        // Backend returns: { message, user: { id, username, email, neptun, startYear, major, fullName, bio, gender, birthYear, ... } }
+        const u = data?.user || null;
+
+        // Normalize for this UI
+        const normalized = u
+          ? {
+              id: u.id,
+              username: u.username,
+              name: u.fullName || "",         // UI used 'name' (from MOCK_USER), backend has 'fullName'
+              gender: u.gender || "",
+              program: u.major || "",         // UI label says "Szak/Program"
+              startYear: u.startYear ?? "",
+              bio: u.bio || "",
+              interests: [],                  // not in backend yet
+              avatarUrl: "",                  // not in backend yet
+              email: u.email,
+              neptun: u.neptun,
+              birthYear: u.birthYear ?? null,
+              createdAt: u.createdAt,
+            }
+          : null;
+
+        setUser(normalized);
+        setPosts(MOCK_POSTS); // placeholder until you have posts endpoint
+      } catch (err) {
+        console.error(err);
+        // Likely invalid/expired token
+        localStorage.removeItem("token");
+        navigate("/login");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [navigate, userId]);
 
   if (loading) return <Skeleton />;
-  if (!user) return <div className="p-6">User not found.</div>;
+  if (!user) return <div className="p-6">{t.notFound}</div>;
 
   return (
     <div className="min-h-screen bg-[#FFF6F2]">
@@ -128,10 +169,10 @@ export default function UserProfilePage() {
         <section className="mt-6">
           <h3 className="text-xl font-extrabold text-[#1F3351] mb-3">{t.interests}:</h3>
           <div className="flex flex-wrap gap-2">
-            {user.interests.length === 0 ? (
-              <span className="text-[#1F3351]/70">—</span>
-            ) : (
+            {user.interests?.length ? (
               user.interests.map((tag) => <Tag key={tag} label={tag} />)
+            ) : (
+              <span className="text-[#1F3351]/70">—</span>
             )}
           </div>
         </section>
@@ -231,24 +272,6 @@ function UserIcon({ className = "", stroke = "#1F3351" }) {
   );
 }
 
-// --- Replace with real backend data ---
-const MOCK_USER = {
-  id: "usr-1",
-  username: "Username",
-  name: "Kiss Máté",
-  gender: "férfi",
-  program: "Mérnökinf. BSc",
-  startYear: 2022,
-  bio: "Ha megadta: neque porro quisquam est qui dolorem ipsum quia dolor sit amet...\nItt lehet több sor is.",
-  interests: ["anime", "example", "coding", "football", "music"],
-  avatarUrl: "",
-};
-
-const MOCK_POSTS = [
-  { id: "p1", title: "Holnap edzés a sportcsarnokban", content: "18:00-tól várunk mindenkit!", createdAt: "2025-09-26", group: "Foci" },
-  { id: "p2", title: "Új jegyzetek feltöltve", content: "Adatszerkezetek 4. előadás jegyzetei.", createdAt: "2025-09-20", group: "Programozás" },
-];
-
 function EditIcon({ className = "", stroke = "#1F3351" }) {
   return (
     <svg
@@ -265,3 +288,9 @@ function EditIcon({ className = "", stroke = "#1F3351" }) {
     </svg>
   );
 }
+
+// --- TEMP posts until backend route exists ---
+const MOCK_POSTS = [
+  { id: "p1", title: "Holnap edzés a sportcsarnokban", content: "18:00-tól várunk mindenkit!", createdAt: "2025-09-26", group: "Foci" },
+  { id: "p2", title: "Új jegyzetek feltöltve", content: "Adatszerkezetek 4. előadás jegyzetei.", createdAt: "2025-09-20", group: "Programozás" },
+];
