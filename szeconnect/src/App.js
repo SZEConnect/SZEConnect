@@ -47,6 +47,8 @@ import GroupPage from "./pages/GroupPage";
 import HomeFeedPage from "./pages/HomeFeedPage";
 import PostComposerPage from "./pages/PostComposerPage";
 import PostDetailsPage from "./pages/PostDetailsPage";
+import CreateGroupPage from "./pages/CreateGroupPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 
 
 function App() {
@@ -65,6 +67,9 @@ function App() {
         <Route path="/home" element={<HomeFeedPage />} />
         <Route path="/post/new" element={<PostComposerPage />} />
         <Route path="/posts/:postId" element={<PostDetailsPage />} />
+        <Route path="/groups/new" element={<CreateGroupPage />} />
+        <Route path="/forgot" element={<ForgotPasswordPage />} />
+
 
       </Routes>
     </BrowserRouter>

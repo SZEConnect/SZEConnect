@@ -155,9 +155,14 @@ export default function LoginPage() {
             </div>
 
             <div className="flex items-center justify-between pt-2 text-sm">
-              <button type="button" className="underline underline-offset-2 decoration-dotted text-[#1F3351]/80 hover:text-[#1F3351]">
+              <button
+                type="button"
+                onClick={() => navigate("/forgot")}
+                className="underline underline-offset-2 decoration-dotted text-[#1F3351]/80 hover:text-[#1F3351]"
+              >
                 {t("forgot")}
               </button>
+
               <div className="flex items-center gap-2">
                 <a href="/info" className="text-[#1F3351]/70 hover:text-[#1F3351]">{t("privacy")}</a>
                 <span aria-hidden>•</span>
