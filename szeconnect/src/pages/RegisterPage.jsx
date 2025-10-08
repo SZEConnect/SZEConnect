@@ -113,23 +113,442 @@ export default function RegisterPage() {
   const [errors, setErrors] = useState({});
 
   // Programs localized
-  const programs = useMemo(() => {
-    const hu = [
-      "Gépészmérnöki BSc",
-      "Informatikai mérnök BSc",
-      "Mérnökinformatikus BSc",
-      "Villamosmérnöki BSc",
-      "Gazdálkodási és menedzsment BSc",
-    ];
-    const en = [
-      "Mechanical Engineering BSc",
-      "Information Engineering BSc",
-      "Computer Engineering BSc",
-      "Electrical Engineering BSc",
-      "Business and Management BSc",
-    ];
-    return lang === "hu" ? hu : en;
-  }, [lang]);
+// Programs localized & grouped
+const programs = useMemo(() => {
+  const hu = [
+    {
+      group: "Alapképzés – Agrár",
+      options: [
+        "Agrár- és üzleti digitalizáció BSc",
+        "Állattenyésztő mérnöki BSc",
+        "Élelmiszermérnöki BSc",
+        "Gazdasági és vidékfejlesztési agrármérnöki BSc",
+        "Mezőgazdasági és élelmiszeripari gépészmérnöki BSc",
+        "Mezőgazdasági mérnöki BSc",
+        "Mezőgazdasági vízgazdálkodási és környezettechnológiai mérnöki BSc",
+      ],
+    },
+    {
+      group: "Alapképzés – Jogi",
+      options: [
+        "Igazságügyi igazgatási BA",
+        "Személyügyi, munkaügyi és szociális igazgatási BA",
+      ],
+    },
+    {
+      group: "Alapképzés – Gazdasági",
+      options: [
+        "Gazdálkodás és menedzsment BSc",
+        "Kereskedelem és marketing BSc",
+        "Nemzetközi gazdálkodás BSc",
+        "Turizmus-vendéglátás BSc",
+      ],
+    },
+    {
+      group: "Alapképzés – Informatikai",
+      options: [
+        "Gazdaságinformatikus BSc",
+        "Mérnökinformatikus BSc",
+        "Programtervező informatikus BSc",
+      ],
+    },
+    {
+      group: "Alapképzés – Egészségügyi",
+      options: [
+        "Ápolás és betegellátás BSc",
+        "Egészségügyi gondozás és prevenció BSc",
+        "Egészségügyi szervező BSc",
+      ],
+    },
+    {
+      group: "Alapképzés – Műszaki",
+      options: [
+        "Építészmérnöki BSc",
+        "Építőmérnöki BSc",
+        "Gépészmérnöki BSc",
+        "Járműmérnöki BSc",
+        "Környezetmérnöki BSc",
+        "Közlekedésmérnöki BSc",
+        "Logisztikai mérnöki BSc",
+        "Mechatronikai mérnöki BSc",
+        "Műszaki menedzser BSc",
+        "Villamosmérnöki BSc",
+      ],
+    },
+    {
+      group: "Alapképzés – Művészeti",
+      options: [
+        "Előadó-művészet BA",
+        "Építőművészet BA",
+        "Formatervezés BA",
+        "Tervezőgrafika BA",
+      ],
+    },
+    {
+      group: "Alapképzés – Pedagógia",
+      options: ["Gyógypedagógia BA", "Szakoktató BA", "Tanító BA"],
+    },
+    {
+      group: "Alapképzés – Sporttudomány",
+      options: ["Rekreáció és életmód BSc"],
+    },
+    {
+      group: "Alapképzés – Társadalomtudomány",
+      options: [
+        "Nemzetközi tanulmányok BA",
+        "Szociális munka BA",
+        "Szociálpedagógia BA",
+        "Szociológia BA",
+      ],
+    },
+    {
+      group: "Alapképzés – Bölcsészettudományi",
+      options: ["Közösségszervezés BA"],
+    },
+
+    // Mesterképzés
+    {
+      group: "Mesterképzés – Agrár",
+      options: [
+        "Állattenyésztő mérnöki MSc",
+        "Élelmiszerbiztonsági és -minőségi mérnöki MSc",
+        "Környezetgazdálkodási agrármérnöki MSc",
+        "Növényorvosi MSc",
+        "Mezőgazdasági biotechnológus MSc",
+        "Mezőgazdasági vízgazdálkodási mérnöki MSc",
+        "Vidékfejlesztési agrármérnöki MSc",
+      ],
+    },
+    {
+      group: "Mesterképzés – Pedagógia",
+      options: [
+        "Agrármérnök tanár MSc",
+        "Tanári (mérnöktanár) MA",
+        "Tanári (zenetanár) MA",
+        "Tanári (zeneművésztanár) MA",
+      ],
+    },
+    {
+      group: "Mesterképzés – Gazdasági",
+      options: [
+        "Agrárközgazdász MSc",
+        "Ellátásilánc menedzsment MSc",
+        "Marketing MSc",
+        "Nemzetközi gazdaság és gazdálkodás MSc",
+        "Regionális és környezeti gazdaságtan MSc",
+        "Vezetés és szervezés MSc",
+        "Turizmus-menedzsment MSc",
+      ],
+    },
+    {
+      group: "Mesterképzés – Egészségügyi",
+      options: [
+        "Egészségügyi menedzser MSc",
+        "Szülészeti-nőgyógyászati szonográfia MSc",
+        "Egészségpszichológia MSc",
+        "Táplálkozástudományi MSc",
+        "Szülésznő MSc",
+      ],
+    },
+    {
+      group: "Mesterképzés – Informatika",
+      options: [
+        "Gazdaságinformatikus MSc",
+        "Mérnökinformatikus MSc",
+        "Programtervező informatikus MSc",
+      ],
+    },
+    {
+      group: "Mesterképzés – Bölcsész",
+      options: [
+        "Emberi erőforrás tanácsadó MA",
+        "Gyermekkultúra MA",
+        "Kulturális mediáció MA",
+      ],
+    },
+    {
+      group: "Mesterképzés – Műszaki",
+      options: [
+        "ESG – környezeti, társadalmi és irányítási szakember MSc",
+        "Építész MSc",
+        "Gépészmérnöki MSc",
+        "Infrastruktúra-építőmérnöki MSc",
+        "Járműmérnöki MSc",
+        "Közlekedésmérnöki MSc",
+        "Logisztikai mérnöki MSc",
+        "Mechatronikai mérnöki MSc",
+        "Motorsportmérnök MSc",
+        "Műszaki menedzser MSc",
+        "Szerkezet-építőmérnöki MSc",
+        "Településmérnöki MSc",
+        "Villamosmérnöki MSc",
+      ],
+    },
+    {
+      group: "Mesterképzés – Művészeti",
+      options: [
+        "Építőművészet MA",
+        "Formatervező művész MA",
+        "Klasszikus hangszerművész MA",
+        "Karmester MA",
+        "Tervezőgrafika MA",
+      ],
+    },
+    {
+      group: "Mesterképzés – Jogi",
+      options: [
+        "Modern technológiák és kiberbiztonság joga MA",
+        "Személyügyi, munkaügyi és szociális igazgatási MA",
+      ],
+    },
+    {
+      group: "Mesterképzés – Társadalomtudomány",
+      options: [
+        "Közösségi és civil tanulmányok MA",
+        "Gondoskodáspolitikai tanulmányok MA",
+      ],
+    },
+
+    // Felsőoktatási szakképzés
+    {
+      group: "Felsőoktatási szakképzés (FOSZK) – Agrár",
+      options: ["Mezőgazdasági FOSZK", "Ménesgazda FOSZK"],
+    },
+    {
+      group: "Felsőoktatási szakképzés (FOSZK) – Jogi",
+      options: ["Jogi FOSZK"],
+    },
+    {
+      group: "Felsőoktatási szakképzés (FOSZK) – Gazdasági",
+      options: [
+        "Gazdálkodás és menedzsment FOSZK",
+        "Kereskedelem és marketing FOSZK",
+        "Turizmus-vendéglátás FOSZK",
+      ],
+    },
+
+    // Osztatlan
+    {
+      group: "Osztatlan képzések – Agrár",
+      options: ["Agrármérnöki"],
+    },
+    {
+      group: "Osztatlan képzések – Jogi",
+      options: ["Jogász"],
+    },
+    {
+      group: "Osztatlan képzések – Műszaki",
+      options: ["Építészmérnöki"],
+    },
+    {
+      group: "Osztatlan képzések – Pedagógiai",
+      options: ["Tanári (mérnöktanár)", "Tanári (zenetanár)"],
+    },
+  ];
+
+  const en = [
+    {
+      group: "Bachelor – Agriculture",
+      options: [
+        "Agricultural and Business Digitalization BSc",
+        "Animal Breeding Engineering BSc",
+        "Food Engineering BSc",
+        "Agricultural Economics and Rural Development Engineering BSc",
+        "Agricultural and Food Industry Mechanical Engineering BSc",
+        "Agricultural Engineering BSc",
+        "Agricultural Water Management and Environmental Technology Engineering BSc",
+      ],
+    },
+    {
+      group: "Bachelor – Law",
+      options: [
+        "Judicial Administration BA",
+        "Human Resources, Labour and Social Administration BA",
+      ],
+    },
+    {
+      group: "Bachelor – Economics",
+      options: [
+        "Business and Management BSc",
+        "Commerce and Marketing BSc",
+        "International Business BSc",
+        "Tourism and Catering BSc",
+      ],
+    },
+    {
+      group: "Bachelor – IT",
+      options: [
+        "Business Informatics BSc",
+        "Computer Engineering BSc",
+        "Software Engineering BSc",
+      ],
+    },
+    {
+      group: "Bachelor – Health",
+      options: [
+        "Nursing and Patient Care BSc",
+        "Health Care and Prevention BSc",
+        "Health Care Management BSc",
+      ],
+    },
+    {
+      group: "Bachelor – Engineering",
+      options: [
+        "Architecture BSc",
+        "Civil Engineering BSc",
+        "Mechanical Engineering BSc",
+        "Vehicle Engineering BSc",
+        "Environmental Engineering BSc",
+        "Transport Engineering BSc",
+        "Logistics Engineering BSc",
+        "Mechatronics Engineering BSc",
+        "Engineering Management BSc",
+        "Electrical Engineering BSc",
+      ],
+    },
+    {
+      group: "Bachelor – Arts",
+      options: ["Performing Arts BA", "Architectural Arts BA", "Design BA", "Graphic Design BA"],
+    },
+    {
+      group: "Bachelor – Education",
+      options: ["Special Education BA", "Vocational Teacher BA", "Primary School Teacher BA"],
+    },
+    {
+      group: "Bachelor – Sport Science",
+      options: ["Recreation and Lifestyle BSc"],
+    },
+    {
+      group: "Bachelor – Social Sciences",
+      options: ["International Relations BA", "Social Work BA", "Social Pedagogy BA", "Sociology BA"],
+    },
+    {
+      group: "Bachelor – Humanities",
+      options: ["Community Organization BA"],
+    },
+
+    // Master
+    {
+      group: "Master – Agriculture",
+      options: [
+        "Animal Breeding Engineering MSc",
+        "Food Safety and Quality Engineering MSc",
+        "Agricultural Environmental Management Engineering MSc",
+        "Plant Protection MSc",
+        "Agricultural Biotechnology MSc",
+        "Agricultural Water Management Engineering MSc",
+        "Rural Development Agricultural Engineering MSc",
+      ],
+    },
+    {
+      group: "Master – Education",
+      options: [
+        "Agricultural Engineering Teacher MSc",
+        "Teacher (Engineering Teacher) MA",
+        "Teacher (Music Teacher) MA",
+        "Teacher (Music Artist Teacher) MA",
+      ],
+    },
+    {
+      group: "Master – Economics",
+      options: [
+        "Agricultural Economics MSc",
+        "Supply Chain Management MSc",
+        "Marketing MSc",
+        "International Economy and Business MSc",
+        "Regional and Environmental Economics MSc",
+        "Management and Leadership MSc",
+        "Tourism Management MSc",
+      ],
+    },
+    {
+      group: "Master – Health",
+      options: [
+        "Health Care Manager MSc",
+        "Obstetrics and Gynecology Sonography MSc",
+        "Health Psychology MSc",
+        "Nutrition Science MSc",
+        "Midwifery MSc",
+      ],
+    },
+    {
+      group: "Master – IT",
+      options: ["Business Informatics MSc", "Computer Engineering MSc", "Software Engineering MSc"],
+    },
+    {
+      group: "Master – Humanities",
+      options: ["Human Resource Counselling MA", "Children’s Culture MA", "Cultural Mediation MA"],
+    },
+    {
+      group: "Master – Engineering",
+      options: [
+        "ESG – Environmental, Social and Governance Specialist MSc",
+        "Architecture MSc",
+        "Mechanical Engineering MSc",
+        "Infrastructure Civil Engineering MSc",
+        "Vehicle Engineering MSc",
+        "Transport Engineering MSc",
+        "Logistics Engineering MSc",
+        "Mechatronics Engineering MSc",
+        "Motorsport Engineering MSc",
+        "Engineering Management MSc",
+        "Structural Civil Engineering MSc",
+        "Urban Engineering MSc",
+        "Electrical Engineering MSc",
+      ],
+    },
+    {
+      group: "Master – Arts",
+      options: ["Architectural Arts MA", "Design MA", "Classical Instrumental Artist MA", "Conductor MA", "Graphic Design MA"],
+    },
+    {
+      group: "Master – Law",
+      options: [
+        "Law of Modern Technologies and Cybersecurity MA",
+        "Human Resources, Labour and Social Administration MA",
+      ],
+    },
+    {
+      group: "Master – Social Sciences",
+      options: ["Community and Civil Studies MA", "Care Policy Studies MA"],
+    },
+
+    // Higher Education Vocational (FOSZK)
+    {
+      group: "HE Vocational (FOSZK) – Agriculture",
+      options: ["Agriculture FOSZK", "Stud Farm Manager FOSZK"],
+    },
+    {
+      group: "HE Vocational (FOSZK) – Law",
+      options: ["Legal Studies FOSZK"],
+    },
+    {
+      group: "HE Vocational (FOSZK) – Economics",
+      options: ["Business and Management FOSZK", "Commerce and Marketing FOSZK", "Tourism and Catering FOSZK"],
+    },
+
+    // Undivided (Single-cycle)
+    {
+      group: "Undivided – Agriculture",
+      options: ["Agricultural Engineering"],
+    },
+    {
+      group: "Undivided – Law",
+      options: ["Law"],
+    },
+    {
+      group: "Undivided – Engineering",
+      options: ["Architectural Engineering"],
+    },
+    {
+      group: "Undivided – Education",
+      options: ["Teacher (Engineering Teacher)", "Teacher (Music Teacher)"],
+    },
+  ];
+
+  return lang === "hu" ? hu : en;
+}, [lang]);
+
 
   // Start years: current → 2000
   const startYears = useMemo(() => {
@@ -267,11 +686,16 @@ export default function RegisterPage() {
               onChange={(e) => onChange("program", e.target.value)}
             >
               <option value="">{t.placeholders.program}</option>
-              {programs.map((p) => (
-                <option key={p} value={p}>{p}</option>
+              {programs.map((grp) => (
+                <optgroup key={grp.group} label={grp.group}>
+                  {grp.options.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </Field>
+
 
           <Field label={`${t.email}${t.requiredMark}`} error={errors.email}>
             <input
