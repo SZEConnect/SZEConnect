@@ -1,14 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-// Registration page matching your mock
-// - HU/EN toggle
-// - Required fields marked with *
-// - Inline validation (Neptun, email, password strength + match, terms checkbox)
-// - Dropdowns: Program (szak), Start year
-// - Optional fields: name, bio, gender, birth year
-// - Tailwind v3-compatible
-
 export default function RegisterPage() {
   const [lang, setLang] = useState("hu");
   const navigate = useNavigate();
@@ -40,8 +32,6 @@ export default function RegisterPage() {
         password: "Min. 8 karakter",
         confirm: "Írd be újra a jelszót",
         bio: "Pár szó magadról (opcionális)",
-        gender: "pl. nő / férfi / egyéb",
-        birthYear: "pl. 2003",
       },
       errors: {
         required: "Kötelező mező.",
@@ -55,8 +45,7 @@ export default function RegisterPage() {
         program: "Válassz szakot.",
         birthYear: "Érvénytelen év (1900–2025).",
       },
-      privacy: "Adatvédelem",
-      terms: "Felhasználási feltételek",
+      privacy: "Adatvédelem és Felhasználási feltételek",
       backLogin: "Vissza a belépéshez",
     };
 
@@ -86,8 +75,6 @@ export default function RegisterPage() {
         password: "Min. 8 characters",
         confirm: "Re-enter password",
         bio: "Tell us about yourself (optional)",
-        gender: "e.g., female / male / other",
-        birthYear: "e.g., 2003",
       },
       errors: {
         required: "This field is required.",
@@ -101,8 +88,7 @@ export default function RegisterPage() {
         program: "Select a program.",
         birthYear: "Invalid year (1900–2025).",
       },
-      privacy: "Privacy",
-      terms: "Terms of Use",
+      privacy: "Privacy and Terms",
       backLogin: "Back to login",
     };
 
@@ -126,20 +112,45 @@ export default function RegisterPage() {
   });
   const [errors, setErrors] = useState({});
 
-  const programs = [
-    "Gépészmérnöki BSc",
-    "Informatikai mérnök BSc",
-    "Mérnökinformatikus BSc",
-    "Villamosmérnöki BSc",
-    "Gazdálkodási és menedzsment BSc",
-  ];
+  // Programs localized
+  const programs = useMemo(() => {
+    const hu = [
+      "Gépészmérnöki BSc",
+      "Informatikai mérnök BSc",
+      "Mérnökinformatikus BSc",
+      "Villamosmérnöki BSc",
+      "Gazdálkodási és menedzsment BSc",
+    ];
+    const en = [
+      "Mechanical Engineering BSc",
+      "Information Engineering BSc",
+      "Computer Engineering BSc",
+      "Electrical Engineering BSc",
+      "Business and Management BSc",
+    ];
+    return lang === "hu" ? hu : en;
+  }, [lang]);
 
+  // Start years: current → 2000
   const startYears = useMemo(() => {
     const now = new Date().getFullYear();
     const years = [];
-    for (let y = now; y >= now - 10; y--) years.push(String(y));
+    for (let y = now; y >= 2000; y--) years.push(String(y));
     return years;
   }, []);
+
+  // Birth years: 2025 → 1900 (numbers only dropdown)
+  const birthYears = useMemo(() => {
+    const years = [];
+    for (let y = 2025; y >= 1900; y--) years.push(String(y));
+    return years;
+  }, []);
+
+  const genderOptions = useMemo(() => {
+    return lang === "hu"
+      ? ["Férfi", "Nő", "Egyéb"]
+      : ["Male", "Female", "Other"];
+  }, [lang]);
 
   const onChange = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -157,6 +168,7 @@ export default function RegisterPage() {
     if (!form.email) e.email = t.errors.required; else if (!reEmail.test(form.email)) e.email = t.errors.email;
     if (!form.password) e.password = t.errors.required; else if (!reStrong.test(form.password)) e.password = t.errors.password;
     if (!form.confirm) e.confirm = t.errors.required; else if (form.password !== form.confirm) e.confirm = t.errors.match;
+
     if (form.birthYear) {
       const n = Number(form.birthYear);
       if (!Number.isInteger(n) || n < 1900 || n > 2025) e.birthYear = t.errors.birthYear;
@@ -170,8 +182,6 @@ export default function RegisterPage() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!validate()) return;
-    // TODO: call your /register API
-    // Map/transform as your backend expects
     const payload = {
       username: form.username,
       name: form.name,
@@ -186,7 +196,6 @@ export default function RegisterPage() {
       acceptedTerms: form.terms,
     };
     console.log("REGISTER →", payload);
-    // alert((lang === "hu" ? "Sikeres regisztráció!" : "Registration successful!"));
     navigate("/interests");
   };
 
@@ -208,10 +217,7 @@ export default function RegisterPage() {
       <div className="mx-auto max-w-6xl px-4 py-8">
         <form onSubmit={handleSubmit} className="grid gap-6 md:grid-cols-2">
           {/* Left column */}
-          <Field
-            label={`${t.username}${t.requiredMark}`}
-            error={errors.username}
-          >
+          <Field label={`${t.username}${t.requiredMark}`} error={errors.username}>
             <input
               className={inputCls(errors.username)}
               value={form.username}
@@ -231,23 +237,17 @@ export default function RegisterPage() {
             />
           </Field>
 
-          <Field
-            label={`${t.neptun}${t.requiredMark}`}
-            error={errors.neptun}
-          >
+          <Field label={`${t.neptun}${t.requiredMark}`} error={errors.neptun}>
             <input
               className={inputCls(errors.neptun)}
               value={form.neptun}
               onChange={(e) => onChange("neptun", e.target.value.toUpperCase())}
-              placeholder={t.placeholders.neptun}
+              placeholder="ABC123"
               maxLength={6}
             />
           </Field>
 
-          <Field
-            label={`${t.startYear}${t.requiredMark}`}
-            error={errors.startYear}
-          >
+          <Field label={`${t.startYear}${t.requiredMark}`} error={errors.startYear}>
             <select
               className={inputCls(errors.startYear)}
               value={form.startYear}
@@ -260,10 +260,7 @@ export default function RegisterPage() {
             </select>
           </Field>
 
-          <Field
-            label={`${t.program}${t.requiredMark}`}
-            error={errors.program}
-          >
+          <Field label={`${t.program}${t.requiredMark}`} error={errors.program}>
             <select
               className={inputCls(errors.program)}
               value={form.program}
@@ -276,10 +273,7 @@ export default function RegisterPage() {
             </select>
           </Field>
 
-          <Field
-            label={`${t.email}${t.requiredMark}`}
-            error={errors.email}
-          >
+          <Field label={`${t.email}${t.requiredMark}`} error={errors.email}>
             <input
               type="email"
               className={inputCls(errors.email)}
@@ -290,10 +284,7 @@ export default function RegisterPage() {
             />
           </Field>
 
-          <Field
-            label={`${t.password}${t.requiredMark}`}
-            error={errors.password}
-          >
+          <Field label={`${t.password}${t.requiredMark}`} error={errors.password}>
             <input
               type="password"
               className={inputCls(errors.password)}
@@ -304,10 +295,7 @@ export default function RegisterPage() {
             />
           </Field>
 
-          <Field
-            label={`${t.confirm}${t.requiredMark}`}
-            error={errors.confirm}
-          >
+          <Field label={`${t.confirm}${t.requiredMark}`} error={errors.confirm}>
             <input
               type="password"
               className={inputCls(errors.confirm)}
@@ -328,25 +316,35 @@ export default function RegisterPage() {
             />
           </Field>
 
+          {/* Gender dropdown */}
           <Field label={t.gender}>
-            <input
+            <select
               className={inputCls()}
               value={form.gender}
               onChange={(e) => onChange("gender", e.target.value)}
-              placeholder={t.placeholders.gender}
-            />
+            >
+              <option value="">{t.placeholders.program}</option>
+              {genderOptions.map((g) => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+            </select>
           </Field>
 
+          {/* Birth year dropdown (numbers only) */}
           <Field label={t.birthYear} error={errors.birthYear}>
-            <input
+            <select
               className={inputCls(errors.birthYear)}
               value={form.birthYear}
               onChange={(e) => onChange("birthYear", e.target.value)}
-              placeholder={t.placeholders.birthYear}
-            />
+            >
+              <option value="">{t.placeholders.program}</option>
+              {birthYears.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
           </Field>
 
-          {/* Right-side column block for terms + button on md+ */}
+          {/* Terms + submit */}
           <div className="md:col-span-2 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border-t pt-6">
             <label className="inline-flex items-start gap-3 text-[#1F3351]">
               <input
@@ -371,11 +369,10 @@ export default function RegisterPage() {
 
           {/* Footer links */}
           <div className="md:col-span-2 flex items-center gap-3 text-sm text-[#1F3351]/80 pt-2">
-            <a href="#" className="hover:text-[#1F3351]">{t.privacy}</a>
+            <a href="/info" className="hover:text-[#1F3351]">{t.privacy}</a>
             <span>•</span>
-            <a href="#" className="hover:text-[#1F3351]">{t.terms}</a>
             <div className="flex-1" />
-            <a href="#" className="hover:text-[#1F3351]">{t.backLogin}</a>
+            <a href="/login" className="hover:text-[#1F3351]">{t.backLogin}</a>
           </div>
         </form>
       </div>
@@ -413,50 +410,15 @@ function inputCls(hasError) {
 
 function LogoShare({ className = "" }) {
   return (
-    <svg
-      viewBox="0 0 400 400"
-      className={className}
-      role="img"
-      aria-label="SzeConnect logo"
-    >
+    <svg viewBox="0 0 400 400" className={className} role="img" aria-label="SzeConnect logo">
       <defs>
         <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
           <feDropShadow dx="0" dy="6" stdDeviation="6" floodOpacity="0.25" />
         </filter>
       </defs>
-
-      {/* Outer ring */}
-      <circle
-        cx="200"
-        cy="200"
-        r="185"
-        fill="none"
-        stroke="#FFFFFF"
-        strokeWidth="30"
-        filter="url(#softShadow)"
-      />
-
-      {/* Connectors */}
-      <line
-        x1="120"
-        y1="206"
-        x2="248"
-        y2="125"
-        stroke="#FFFFFF"
-        strokeWidth="26"
-        strokeLinecap="round"
-      />
-      <line
-        x1="120"
-        y1="206"
-        x2="248"
-        y2="279"
-        stroke="#FFFFFF"
-        strokeWidth="26"
-        strokeLinecap="round"
-      />
-
-      {/* Nodes with white stroke */}
+      <circle cx="200" cy="200" r="185" fill="none" stroke="#FFFFFF" strokeWidth="30" filter="url(#softShadow)" />
+      <line x1="120" y1="206" x2="248" y2="125" stroke="#FFFFFF" strokeWidth="26" strokeLinecap="round" />
+      <line x1="120" y1="206" x2="248" y2="279" stroke="#FFFFFF" strokeWidth="26" strokeLinecap="round" />
       <circle cx="120" cy="206" r="41" fill="#E1860E" stroke="#FFFFFF" strokeWidth="6" />
       <circle cx="248" cy="125" r="41" fill="#E1860E" stroke="#FFFFFF" strokeWidth="6" />
       <circle cx="248" cy="279" r="41" fill="#2A3F5B" stroke="#FFFFFF" strokeWidth="6" />

@@ -49,7 +49,8 @@ export default function GroupPage() {
 
   const onCreatePost = () => {
     // TODO: open modal / navigate to composer with groupId
-    alert(lang === "hu" ? "Bejegyzés írása (minta)" : "Open post composer (demo)");
+    // alert(lang === "hu" ? "Bejegyzés írása (minta)" : "Open post composer (demo)");
+    navigate("/post/new");
   };
 
   if (loading) return <Skeleton />;

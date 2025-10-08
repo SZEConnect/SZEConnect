@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 
+
 // Tailwind is assumed to be set up in the host project.
-// Drop this component anywhere (e.g., src/pages/Login.jsx) and route to it.
 // Colors used:
 //  - Cream bg: #FFF6F2
 //  - Navy: #1F3351
@@ -27,8 +27,8 @@ export default function LoginPage() {
       register: "Regisztrálás",
       or: "vagy",
       forgot: "Elfelejtett jelszó?",
-      privacy: "Adatvédelem",
-      terms: "Felhasználási feltételek",
+      privacy: "Adatvédelem és Felhasználási feltételek",
+      // terms: "Felhasználási feltételek",
       errors: {
         neptun: "Érvénytelen Neptun-kód (6 karakter, A–Z és számok).",
         password: "A jelszó nem lehet üres.",
@@ -43,8 +43,8 @@ export default function LoginPage() {
       register: "Register",
       or: "or",
       forgot: "Forgot password?",
-      privacy: "Privacy",
-      terms: "Terms",
+      privacy: "Privacy and Terms",
+      // terms: "Terms",
       errors: {
         neptun: "Invalid Neptun code (6 chars, A–Z and digits).",
         password: "Password cannot be empty.",
@@ -68,17 +68,13 @@ export default function LoginPage() {
     // TODO: replace with real API call
     console.log("LOGIN →", { neptun: neptun.trim().toUpperCase(), password });
     // Demo: redirect simulate
-    alert(`${t("login")} OK`);
+    navigate("/home");
   };
-
-  // const onRegister = () => {
-  //   // Hook this to your router, e.g., navigate('/register')
-  //   alert(`${t("register")} → route not wired yet`);
-  // };
 
   const onRegister = () => {
     navigate("/register");
   };
+
 
 
   return (
@@ -163,9 +159,9 @@ export default function LoginPage() {
                 {t("forgot")}
               </button>
               <div className="flex items-center gap-2">
-                <a href="#" className="text-[#1F3351]/70 hover:text-[#1F3351]">{t("privacy")}</a>
+                <a href="/info" className="text-[#1F3351]/70 hover:text-[#1F3351]">{t("privacy")}</a>
                 <span aria-hidden>•</span>
-                <a href="#" className="text-[#1F3351]/70 hover:text-[#1F3351]">{t("terms")}</a>
+                {/* <a href="#" className="text-[#1F3351]/70 hover:text-[#1F3351]">{t("terms")}</a> */}
               </div>
             </div>
           </form>
