@@ -106,7 +106,10 @@ export default function UserProfilePage() {
               {/* <div className="w-16 h-16 rounded-full border-2 border-white/60 flex items-center justify-center bg-[#1F3351]">
                 <LogoMark className="w-10 h-10" variant="light" />
               </div> */}
-              <div className="w-20 h-20"><LogoMark className="w-full h-full" variant="light" /></div>
+              <Link
+                to="/home">
+                <div className="w-20 h-20"><LogoMark className="w-full h-full" variant="light" /></div>
+              </Link>
 
               <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight truncate">
                 {user.username}
