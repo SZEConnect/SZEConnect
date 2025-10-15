@@ -72,10 +72,40 @@ export default function GroupPage() {
             <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight truncate">{group.name}</h1>
           </div>
           <div className="flex items-center gap-3">
-            <Link to="/info" className="hidden sm:inline w-10 h-10 inline-flex items-center justify-center rounded-full border-2 border-white/60 hover:bg-white/10" aria-label="Info">i</Link>
-            <div className="hidden md:block w-12 h-12"><LogoMark className="w-full h-full" variant="light" /></div>
-            <button onClick={() => setLang(lang === "hu" ? "en" : "hu")} className="rounded-lg border border-white/30 bg-white/80 backdrop-blur px-3 py-1.5 text-sm font-medium text-[#1F3351] hover:bg-white">{lang === "hu" ? "EN" : "HU"}</button>
-          </div>
+          {/* Info button - italic i */}
+          <Link
+            to="/info"
+            className="w-10 h-10 inline-flex items-center justify-center rounded-full border-2 border-white/60 hover:bg-white/10 text-xl italic font-serif"
+          >
+            i
+          </Link>
+
+          {/* User button - white icon */}
+          <Link
+            to="/profile"
+            className="w-10 h-10 inline-flex items-center justify-center rounded-full border-2 border-white/60 hover:bg-white/10"
+            aria-label="Profile"
+          >
+            <UserIcon className="w-6 h-6" stroke="#FFFFFF" />
+          </Link>
+
+          {/* Logout button */}
+          <button
+            onClick={() => navigate("/login")}
+            className="rounded-lg border border-white/30 bg-[#E1860E] text-white px-3 py-1.5 text-sm font-medium hover:bg-[#cf760c] transition"
+          >
+            Logout
+          </button>
+
+          {/* Language toggle */}
+          <button
+            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+            className="rounded-lg border border-white/30 bg-white/80 backdrop-blur px-3 py-1.5 text-sm font-medium text-[#1F3351] hover:bg-white"
+          >
+            {lang === "hu" ? "EN" : "HU"}
+          </button>
+        </div>
+
         </div>
         <div className="h-3 bg-[#E1860E]" />
       </header>

@@ -68,10 +68,35 @@ export default function SearchResultsPage() {
           </form>
 
           <div className="flex items-center gap-3">
-            <Link to="/info" className="w-10 h-10 inline-flex items-center justify-center rounded-full border-2 border-white/60 hover:bg-white/10">i</Link>
-            <Link to="/profile" className="w-10 h-10 inline-flex items-center justify-center rounded-full border-2 border-white/60 hover:bg-white/10" aria-label="Profile">
-              <UserIcon className="w-6 h-6" />
+            {/* Info button - italic i */}
+            <Link
+              to="/info"
+              className="w-10 h-10 inline-flex items-center justify-center rounded-full border-2 border-white/60 hover:bg-white/10 text-xl italic font-serif"
+            >
+              i
             </Link>
+
+            {/* User button - white icon */}
+            <Link
+              to="/profile"
+              className="w-10 h-10 inline-flex items-center justify-center rounded-full border-2 border-white/60 hover:bg-white/10"
+              aria-label="Profile"
+            >
+              <UserIcon className="w-6 h-6" stroke="#FFFFFF" />
+            </Link>
+
+            {/* Logout button */}
+            <button
+              onClick={() => {
+                // For now, just navigate to login (until backend auth is done)
+                navigate("/login");
+              }}
+              className="rounded-lg border border-white/30 bg-[#E1860E] text-white px-3 py-1.5 text-sm font-medium hover:bg-[#cf760c] transition"
+            >
+              Logout
+            </button>
+
+            {/* Language toggle */}
             <button
               onClick={() => setLang(lang === "hu" ? "en" : "hu")}
               className="rounded-lg border border-white/30 bg-white/80 backdrop-blur px-3 py-1.5 text-sm font-medium text-[#1F3351] hover:bg-white"
@@ -79,6 +104,7 @@ export default function SearchResultsPage() {
               {lang === "hu" ? "EN" : "HU"}
             </button>
           </div>
+
         </div>
         <div className="h-3 bg-[#E1860E]" />
       </header>
@@ -157,11 +183,12 @@ function LogoMark({ className = "", variant = "light" }) {
   );
 }
 
-function UserIcon({ className = "" }) {
+function UserIcon({ className = "", stroke = "#1F3351" }) {
   return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="#1F3351" strokeWidth="2">
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke={stroke} strokeWidth="2">
       <circle cx="12" cy="8" r="4" />
       <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
     </svg>
   );
 }
+
