@@ -142,18 +142,33 @@ export default function GroupPage() {
                 <li key={p.id}>
                   <article className="rounded-xl border-2 border-[#1F3351] bg-[#EDF5FA] shadow-sm overflow-hidden">
                     <header className="px-4 py-3 border-b border-[#1F3351]/10 flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-white border border-[#1F3351]/30 flex items-center justify-center">
+                      {/* Clickable user profile */}
+                      <Link
+                        to={`/users/${p.authorId || 'usr-demo'}`} // temporary mock ID
+                        className="w-10 h-10 rounded-full bg-white border border-[#1F3351]/30 flex items-center justify-center hover:bg-[#fdfdfd]"
+                      >
                         <UserIcon className="w-6 h-6" />
-                      </div>
+                      </Link>
                       <div className="min-w-0">
-                        <p className="text-[#1F3351] font-semibold truncate">{p.author}</p>
+                        <Link
+                          to={`/users/${p.authorId || 'usr-demo'}`}
+                          className="text-[#1F3351] font-semibold truncate hover:underline"
+                        >
+                          {p.author}
+                        </Link>
                         <p className="text-[#1F3351]/70 text-xs">{p.createdAt}</p>
                       </div>
                     </header>
-                    <div className="px-4 py-3 text-[#1F3351]/90 whitespace-pre-wrap">{p.title && <p className="font-bold mb-1">{p.title}</p>}{p.content}</div>
+
+                    {/* Clickable post body */}
+                    <Link to={`/posts/${p.id}`} className="block px-4 py-3 text-[#1F3351]/90 whitespace-pre-wrap hover:bg-[#f5f9fc] transition">
+                      {p.title && <p className="font-bold mb-1">{p.title}</p>}
+                      {p.content}
+                    </Link>
                   </article>
                 </li>
               ))}
+
             </ul>
           )}
         </section>

@@ -99,26 +99,59 @@ export default function UserProfilePage() {
   return (
     <div className="min-h-screen bg-[#FFF6F2]">
       {/* Header */}
-      <header className="bg-[#1F3351] text-white">
-        <div className="mx-auto max-w-6xl px-4 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-white/10 border-2 border-white/30 flex items-center justify-center">
-              <UserIcon className="w-9 h-9" stroke="#FFFFFF" />
+        <header className="bg-[#1F3351] text-white">
+          <div className="mx-auto max-w-6xl px-4 py-5 flex items-center justify-between">
+            {/* LEFT SIDE: Logo + Username */}
+            <div className="flex items-center gap-4 min-w-0">
+              {/* <div className="w-16 h-16 rounded-full border-2 border-white/60 flex items-center justify-center bg-[#1F3351]">
+                <LogoMark className="w-10 h-10" variant="light" />
+              </div> */}
+              <div className="w-20 h-20"><LogoMark className="w-full h-full" variant="light" /></div>
+
+              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight truncate">
+                {user.username}
+              </h1>
             </div>
-            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight truncate">{user.username}</h1>
+
+            {/* RIGHT SIDE: Info, Profile, Logout, Language */}
+            <div className="flex items-center gap-3">
+              {/* Info button */}
+              <Link
+                to="/info"
+                className="w-10 h-10 inline-flex items-center justify-center rounded-full border-2 border-white/60 hover:bg-white/10 text-xl italic font-serif"
+              >
+                i
+              </Link>
+
+              {/* Profile button */}
+              <Link
+                to="/profile"
+                className="w-10 h-10 inline-flex items-center justify-center rounded-full border-2 border-white/60 hover:bg-white/10"
+                aria-label="Profile"
+              >
+                <UserIcon className="w-6 h-6" stroke="#FFFFFF" />
+              </Link>
+
+              {/* Logout button */}
+              <button
+                onClick={() => navigate("/login")}
+                className="rounded-lg border border-white/30 bg-[#E1860E] text-white px-4 py-1.5 text-sm font-medium hover:bg-[#cf760c] transition"
+              >
+                Logout
+              </button>
+
+              {/* Language toggle */}
+              <button
+                onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+                className="rounded-lg border border-white/30 bg-white/80 backdrop-blur px-3 py-1.5 text-sm font-medium text-[#1F3351] hover:bg-white"
+              >
+                {lang === "hu" ? "EN" : "HU"}
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="hidden md:block w-12 h-12"><LogoMark className="w-full h-full" variant="light" /></div>
-            <button
-              onClick={() => setLang(lang === "hu" ? "en" : "hu")}
-              className="rounded-lg border border-white/30 bg-white/80 backdrop-blur px-3 py-1.5 text-sm font-medium text-[#1F3351] hover:bg-white"
-            >
-              {lang === "hu" ? "EN" : "HU"}
-            </button>
-          </div>
-        </div>
-        <div className="h-3 bg-[#E1860E]" />
-      </header>
+          <div className="h-3 bg-[#E1860E]" />
+        </header>
+
 
       <main className="mx-auto max-w-6xl px-4 py-6">
         {/* Top info grid */}
@@ -150,6 +183,7 @@ export default function UserProfilePage() {
             >
               <EditIcon className="w-5 h-5" /> {t.edit}
             </button>
+
           </div>
         </div>
 
@@ -214,23 +248,41 @@ function Tag({ label }) {
     </span>
   );
 }
-
 function PostCard({ post }) {
   return (
-    <article className="rounded-xl border-2 border-[#1F3351] bg-white shadow-sm overflow-hidden">
+    <article className="rounded-xl border-2 border-[#1F3351] bg-white shadow-sm overflow-hidden hover:shadow-md transition">
       <header className="px-4 py-3 border-b border-[#1F3351]/10 flex items-center gap-2">
-        <div className="w-8 h-8 rounded-full bg-[#EDF5FA] border border-[#1F3351]/40 flex items-center justify-center">
+        {/* Clickable user icon */}
+        <Link
+          to={`/users/${post.userId || 'usr-demo'}`}
+          className="w-8 h-8 rounded-full bg-[#EDF5FA] border border-[#1F3351]/40 flex items-center justify-center hover:bg-[#f9fbff]"
+        >
           <UserIcon className="w-5 h-5" />
-        </div>
+        </Link>
         <div className="min-w-0">
-          <h4 className="text-[#1F3351] font-bold truncate">{post.title}</h4>
-          <p className="text-[#1F3351]/70 text-xs truncate">{post.createdAt} · {post.group || "Public"}</p>
+          <Link
+            to={`/posts/${post.id}`}
+            className="text-[#1F3351] font-bold truncate hover:underline"
+          >
+            {post.title}
+          </Link>
+          <p className="text-[#1F3351]/70 text-xs truncate">
+            {post.createdAt} · {post.group || "Public"}
+          </p>
         </div>
       </header>
-      <div className="px-4 py-3 text-[#1F3351]/90 whitespace-pre-wrap">{post.content}</div>
+
+      {/* Clickable content area */}
+      <Link
+        to={`/posts/${post.id}`}
+        className="block px-4 py-3 text-[#1F3351]/90 whitespace-pre-wrap hover:bg-[#f5f9fc]"
+      >
+        {post.content}
+      </Link>
     </article>
   );
 }
+
 
 function Skeleton() {
   return (

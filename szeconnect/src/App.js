@@ -94,6 +94,7 @@ import PostDetailsPage from "./pages/PostDetailsPage";
 import CreateGroupPage from "./pages/CreateGroupPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import UsersTestPage from "./pages/UsersTestPage";
+import EditProfilePage from "./pages/EditProfilPage";
 
 // simple guard for pages that need a token
 function ProtectedRoute({ children }) {
@@ -136,6 +137,8 @@ export default function App() {
         <Route path="/groups/new" element={<ProtectedRoute><CreateGroupPage /></ProtectedRoute>} />
         <Route path="/forgot" element={<ForgotPasswordPage />} />
         <Route path="/dev/users" element={<UsersTestPage />} />
+        <Route path="/edit-profile" element={<EditProfilePage />} />
+
 
         {/* fallback */}
         <Route path="*" element={<Navigate to="/login" replace />} />
