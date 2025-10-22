@@ -655,12 +655,21 @@ const programs = useMemo(() => {
       <div className="bg-[#1F3351] text-white">
         <div className="mx-auto max-w-6xl px-4 py-6 flex items-center justify-between">
           <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">{t.title}</h1>
-          <div className="flex items-center gap-4">
-            <span className="hidden sm:inline text-white/90 font-semibold">{t.brand}</span>
-            <div className="w-14 h-14">
-              <LogoShare className="w-full h-full" />
+            <div className="flex items-center gap-3">
+              <span className="hidden sm:inline text-white/90 font-semibold">{t.brand}</span>
+              <div className="w-14 h-14">
+                <LogoShare className="w-full h-full" />
+              </div>
+
+              {/* Language toggle (moved into header) */}
+              <button
+                onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+                className="rounded-lg border border-white/30 bg-white/80 backdrop-blur px-3 py-1.5 text-sm font-medium text-[#1F3351] hover:bg-white"
+              >
+                {lang === "hu" ? "EN" : "HU"}
+              </button>
             </div>
-          </div>
+
         </div>
       </div>
 
@@ -827,19 +836,8 @@ const programs = useMemo(() => {
             <a href="/info" className="hover:text-[#1F3351]">{t.privacy}</a>
             <span>•</span>
             <div className="flex-1" />
-            <a href="/login" className="hover:text-[#1F3351]">{t.backLogin}</a>
           </div>
         </form>
-      </div>
-
-      {/* Language toggle */}
-      <div className="fixed top-4 right-4">
-        <button
-          onClick={() => setLang(lang === "hu" ? "en" : "hu")}
-          className="rounded-lg border border-[#1F3351]/30 bg-white/80 backdrop-blur px-3 py-1.5 text-sm font-medium text-[#1F3351] hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1F3351]/40"
-        >
-          {lang === "hu" ? "EN" : "HU"}
-        </button>
       </div>
     </div>
   );

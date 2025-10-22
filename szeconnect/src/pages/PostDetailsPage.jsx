@@ -1,12 +1,41 @@
+// import { useEffect, useMemo, useState } from "react";
+// import { Link, useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
 /* ---------------- Page ---------------- */
 
 export default function PostDetailsPage() {
   const { postId } = useParams();
   const [lang, setLang] = useState("hu");
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [replyDrafts, setReplyDrafts] = useState({}); // stores reply text per comment
+
+
+  const submitReply = (commentId) => {
+  const text = replyDrafts[commentId]?.trim();
+  if (!text) return;
+
+  const newReply = {
+    id: `r-${commentId}-${Date.now()}`,
+    author: "You",
+    authorId: "me",
+    createdAt: new Date().toISOString().slice(0, 16).replace("T", " "),
+    body: text,
+  };
+
+  setComments((prev) =>
+    prev.map((c) =>
+      c.id === commentId
+        ? { ...c, replies: [...(c.replies || []), newReply] }
+        : c
+    )
+  );
+
+  setReplyDrafts((prev) => ({ ...prev, [commentId]: "" }));
+};
+
 
   const t = useMemo(() => {
     const hu = {
@@ -70,9 +99,9 @@ export default function PostDetailsPage() {
       group: post.group,
       groupId: post.groupId,
       createdAt: new Date().toISOString().slice(0, 16).replace("T", " "),
-      title: draft.split(/\n/)[0].slice(0, 60) || (lang === "hu" ? "Hozzászólás" : "Comment"),
       body: draft,
     };
+
     setComments((prev) => [newC, ...prev]);
     setDraft("");
   };
@@ -87,11 +116,23 @@ export default function PostDetailsPage() {
         <div className="mx-auto max-w-5xl px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12">
-              <LogoMark className="w-full h-full" variant="light" />
+              <Link
+                to="/home">
+                  <LogoMark className="w-full h-full" variant="light" />  
+                </Link>
             </div>
             <span className="text-2xl font-extrabold">SzeConnect</span>
           </div>
           <div className="flex items-center gap-3">
+            {/* Info button - italic i */}
+            <Link
+              to="/info"
+              className="w-10 h-10 inline-flex items-center justify-center rounded-full border-2 border-white/60 hover:bg-white/10 text-xl italic font-serif"
+            >
+              i
+            </Link>
+
+            {/* User button - white icon */}
             <Link
               to="/profile"
               className="w-10 h-10 inline-flex items-center justify-center rounded-full border-2 border-white/60 hover:bg-white/10"
@@ -99,11 +140,20 @@ export default function PostDetailsPage() {
             >
               <UserIcon className="w-6 h-6" stroke="#FFFFFF" />
             </Link>
+
+            {/* Language toggle */}
             <button
               onClick={() => setLang(lang === "hu" ? "en" : "hu")}
               className="rounded-lg border border-white/30 bg-white/80 backdrop-blur px-3 py-1.5 text-sm font-medium text-[#1F3351] hover:bg-white"
             >
               {lang === "hu" ? "EN" : "HU"}
+            </button>
+                      {/* Logout button */}
+            <button
+              onClick={() => navigate("/login")}
+              className="rounded-lg border border-white/30 bg-[#E1860E] text-white px-3 py-1.5 text-sm font-medium hover:bg-[#cf760c] transition"
+            >
+              Logout
             </button>
           </div>
         </div>
@@ -226,39 +276,95 @@ export default function PostDetailsPage() {
             </div>
           </form>
 
-          <ul className="space-y-4">
-            {comments.map((c) => (
-              <li key={c.id}>
-                <article className="rounded-2xl border-2 border-[#1F3351] bg-[#EDF5FA] overflow-hidden">
-                  <header className="px-4 py-3 border-b border-[#1F3351]/10 flex items-center gap-3">
-                    <Link
-                      to={`/users/${c.authorId}`}
-                      className="w-10 h-10 rounded-full bg-white border border-[#1F3351]/30 flex items-center justify-center"
-                    >
-                      <UserIcon className="w-6 h-6" />
-                    </Link>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 text-[#1F3351] font-semibold">
-                        <Link to={`/users/${c.authorId}`} className="hover:underline">
-                          {c.author}
-                        </Link>
-                        <span className="text-[#1F3351]/60 text-sm">{c.createdAt}</span>
-                        <span className="ml-auto text-[#1F3351]/70 text-sm">
-                          <Link to={`/groups/${c.groupId}`} className="hover:underline">
-                            {c.group}
-                          </Link>
-                        </span>
-                      </div>
-                      <div className="text-[#1F3351] font-bold">{c.title}</div>
+        <ul className="space-y-4">
+          {comments.map((c) => (
+            <li key={c.id}>
+              <article className="rounded-2xl border-2 border-[#1F3351] bg-[#EDF5FA] overflow-hidden">
+                {/* Comment header */}
+                <header className="px-4 py-3 border-b border-[#1F3351]/10 flex items-center gap-3">
+                  <Link
+                    to={`/users/${c.authorId}`}
+                    className="w-10 h-10 rounded-full bg-white border border-[#1F3351]/30 flex items-center justify-center"
+                  >
+                    <UserIcon className="w-6 h-6" />
+                  </Link>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 text-[#1F3351] font-semibold">
+                      <Link to={`/users/${c.authorId}`} className="hover:underline">
+                        {c.author}
+                      </Link>
+                      <span className="text-[#1F3351]/60 text-sm">{c.createdAt}</span>
                     </div>
-                  </header>
-                  <div className="px-4 py-3 text-[#1F3351]/90 whitespace-pre-wrap">
-                    {c.body}
                   </div>
-                </article>
-              </li>
-            ))}
-          </ul>
+                </header>
+
+                {/* Body */}
+                <div className="px-4 py-3 text-[#1F3351]/90 whitespace-pre-wrap">
+                  {c.body}
+                </div>
+
+                {/* Reply button + box */}
+                <div className="px-4 pb-3">
+                  <button
+                    onClick={() =>
+                      setReplyDrafts((prev) => ({
+                        ...prev,
+                        [c.id]: prev[c.id] !== undefined ? undefined : "",
+                      }))
+                    }
+                    className="text-sm font-semibold text-[#1F3351] hover:underline"
+                  >
+                    {replyDrafts[c.id] !== undefined
+                      ? lang === "hu"
+                        ? "Mégse"
+                        : "Cancel"
+                      : lang === "hu"
+                      ? "Válasz"
+                      : "Reply"}
+                  </button>
+
+                  {/* Reply box (visible if opened) */}
+                  {replyDrafts[c.id] !== undefined && (
+                    <div className="mt-3 flex items-start gap-2">
+                      <textarea
+                        value={replyDrafts[c.id]}
+                        onChange={(e) =>
+                          setReplyDrafts((prev) => ({
+                            ...prev,
+                            [c.id]: e.target.value,
+                          }))
+                        }
+                        placeholder={lang === "hu" ? "Írj egy választ..." : "Write a reply..."}
+                        rows={2}
+                        className="flex-1 rounded-lg border-2 border-[#1F3351] bg-white px-3 py-2 text-sm outline-none focus:ring-4 focus:ring-[#1F3351]/20"
+                      />
+                      <button
+                        onClick={() => submitReply(c.id)}
+                        className="shrink-0 rounded-lg bg-[#E1860E] text-white font-semibold px-4 py-2 shadow hover:opacity-90 text-sm"
+                      >
+                        {lang === "hu" ? "Küldés" : "Send"}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Display replies */}
+                  {c.replies?.length > 0 && (
+                    <ul className="mt-3 space-y-2 pl-6 border-l-2 border-[#1F3351]/20">
+                      {c.replies.map((r) => (
+                        <li key={r.id} className="bg-white rounded-lg px-3 py-2">
+                          <div className="text-sm text-[#1F3351] font-semibold">{r.author}</div>
+                          <div className="text-xs text-[#1F3351]/60">{r.createdAt}</div>
+                          <p className="text-[#1F3351]/90 text-sm mt-1">{r.body}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </article>
+            </li>
+          ))}
+        </ul>
+
         </section>
       </main>
     </div>
@@ -292,23 +398,37 @@ function UserIcon({ className = "", stroke = "#1F3351" }) {
 
 function ThumbUp({ className = "", stroke = "#1F3351" }) {
   return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 9V5a3 3 0 00-6 0v4" />
-      <path d="M5 15h9l4-8h-7" />
-      <path d="M5 15v6" />
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke={stroke}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M2 21h4V9H2v12zM22 9c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32a1 1 0 0 0-.29-.7L13 1 6.59 7.41C6.22 7.78 6 8.3 6 8.83V19c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22L22 11.34V9z" />
     </svg>
   );
 }
 
 function ThumbDown({ className = "", stroke = "#1F3351" }) {
   return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M10 15v4a3 3 0 006 0v-4" />
-      <path d="M19 9H10L6 17h7" />
-      <path d="M19 9V3" />
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke={stroke}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M22 3h-4v12h4V3zM2 15c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32a1 1 0 0 0 .29.7L11 23l6.41-6.41c.37-.37.59-.89.59-1.42V5c0-1.1-.9-2-2-2H7C6.17 3 5.46 3.5 5.16 4.22L2 12.66V15z" />
     </svg>
   );
 }
+
+
 
 function Skeleton() {
   return (
@@ -323,6 +443,8 @@ function Skeleton() {
     </div>
   );
 }
+
+
 
 
 /* --------------- Mock data --------------- */

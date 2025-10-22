@@ -151,7 +151,7 @@ export default function InterestsPage() {
             </div>
           </div>
 
-          <div>
+          {/* <div>
             <p className="text-xl font-extrabold text-[#1F3351] leading-tight mb-3">{t.suggestQ}</p>
             <div className="flex gap-3 items-center">
               <input
@@ -168,7 +168,7 @@ export default function InterestsPage() {
                 +
               </button>
             </div>
-          </div>
+          </div> */}
 
           <div className="pt-2">
             <button

@@ -94,7 +94,15 @@ export default function CreateGroupPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Profile button */}
+            {/* Info button */}
+            <Link
+              to="/info"
+              className="w-10 h-10 inline-flex items-center justify-center rounded-full border-2 border-white/60 hover:bg-white/10 text-xl italic font-serif"
+            >
+              i
+            </Link>
+
+            {/* User button - white icon */}
             <Link
               to="/profile"
               className="w-10 h-10 inline-flex items-center justify-center rounded-full border-2 border-white/60 hover:bg-white/10"
@@ -103,12 +111,19 @@ export default function CreateGroupPage() {
               <UserIcon className="w-6 h-6" stroke="#FFFFFF" />
             </Link>
 
-            {/* Lang toggle */}
+            {/* Language toggle */}
             <button
               onClick={() => setLang(lang === "hu" ? "en" : "hu")}
               className="rounded-lg border border-white/30 bg-white/80 backdrop-blur px-3 py-1.5 text-sm font-medium text-[#1F3351] hover:bg-white"
             >
               {lang === "hu" ? "EN" : "HU"}
+            </button>
+            {/* Logout button */}
+            <button
+              onClick={() => navigate("/login")}
+              className="rounded-lg border border-white/30 bg-[#E1860E] text-white px-3 py-1.5 text-sm font-medium hover:bg-[#cf760c] transition"
+            >
+              Logout
             </button>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+
 
 export default function PostComposerPage() {
   const navigate = useNavigate();
@@ -139,12 +140,39 @@ export default function PostComposerPage() {
               {t.title}
             </h1>
           </div>
-          <button
-            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
-            className="rounded-lg border border-white/30 bg-white/80 backdrop-blur px-3 py-1.5 text-sm font-medium text-[#1F3351] hover:bg-white"
-          >
-            {lang === "hu" ? "EN" : "HU"}
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Info button */}
+            <Link
+              to="/info"
+              className="w-10 h-10 inline-flex items-center justify-center rounded-full border-2 border-white/60 hover:bg-white/10 text-xl italic font-serif"
+            >
+              i
+            </Link>
+
+            {/* User button - white icon */}
+            <Link
+              to="/profile"
+              className="w-10 h-10 inline-flex items-center justify-center rounded-full border-2 border-white/60 hover:bg-white/10"
+              aria-label="Profile"
+            >
+              <UserIcon className="w-6 h-6" stroke="#FFFFFF" />
+            </Link>
+
+            {/* Language toggle */}
+            <button
+              onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+              className="rounded-lg border border-white/30 bg-white/80 backdrop-blur px-3 py-1.5 text-sm font-medium text-[#1F3351] hover:bg-white"
+            >
+              {lang === "hu" ? "EN" : "HU"}
+            </button>
+            {/* Logout button */}
+            <button
+              onClick={() => navigate("/login")}
+              className="rounded-lg border border-white/30 bg-[#E1860E] text-white px-3 py-1.5 text-sm font-medium hover:bg-[#cf760c] transition"
+            >
+              Logout
+            </button>
+          </div>
         </div>
         <div className="h-3 bg-[#E1860E]" />
       </header>
@@ -366,6 +394,21 @@ function ChevronDown({ className = "" }) {
   return (
     <svg viewBox="0 0 20 20" className={className} fill="none" stroke="#1F3351" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M5 7l5 5 5-5" />
+    </svg>
+  );
+}
+
+function UserIcon({ className = "", stroke = "#1F3351" }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke={stroke}
+      strokeWidth="2"
+    >
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
     </svg>
   );
 }

@@ -25,10 +25,10 @@ export default function UserProfilePage() {
       program: "Szak",
       name: "Név",
       gender: "Nem",
-      bio: "Bio",
+      bio: "Röviden a felhasználóról",
       interests: "Érdeklődések",
       edit: "Szerkesztés",
-      noBio: "Nincs megadott bio.",
+      noBio: "Nem írt magáról.",
       posts: "Bejegyzések",
       notFound: "Felhasználó nem található.",
     };
@@ -135,20 +135,19 @@ export default function UserProfilePage() {
                 <UserIcon className="w-6 h-6" stroke="#FFFFFF" />
               </Link>
 
-              {/* Logout button */}
-              <button
-                onClick={() => navigate("/login")}
-                className="rounded-lg border border-white/30 bg-[#E1860E] text-white px-4 py-1.5 text-sm font-medium hover:bg-[#cf760c] transition"
-              >
-                Logout
-              </button>
-
               {/* Language toggle */}
               <button
                 onClick={() => setLang(lang === "hu" ? "en" : "hu")}
                 className="rounded-lg border border-white/30 bg-white/80 backdrop-blur px-3 py-1.5 text-sm font-medium text-[#1F3351] hover:bg-white"
               >
                 {lang === "hu" ? "EN" : "HU"}
+              </button>
+              {/* Logout button */}
+              <button
+                onClick={() => navigate("/login")}
+                className="rounded-lg border border-white/30 bg-[#E1860E] text-white px-4 py-1.5 text-sm font-medium hover:bg-[#cf760c] transition"
+              >
+                Logout
               </button>
             </div>
           </div>

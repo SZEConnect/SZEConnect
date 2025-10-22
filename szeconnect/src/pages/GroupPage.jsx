@@ -8,6 +8,12 @@ export default function GroupPage() {
   const [loading, setLoading] = useState(true);
   const [group, setGroup] = useState(null);
   const [posts, setPosts] = useState([]);
+  const [joined, setJoined] = useState(false);
+
+const handleJoinToggle = () => {
+  setJoined(!joined);
+};
+
 
   const t = useMemo(() => {
     const hu = {
@@ -89,20 +95,19 @@ export default function GroupPage() {
             <UserIcon className="w-6 h-6" stroke="#FFFFFF" />
           </Link>
 
-          {/* Logout button */}
-          <button
-            onClick={() => navigate("/login")}
-            className="rounded-lg border border-white/30 bg-[#E1860E] text-white px-3 py-1.5 text-sm font-medium hover:bg-[#cf760c] transition"
-          >
-            Logout
-          </button>
-
           {/* Language toggle */}
           <button
             onClick={() => setLang(lang === "hu" ? "en" : "hu")}
             className="rounded-lg border border-white/30 bg-white/80 backdrop-blur px-3 py-1.5 text-sm font-medium text-[#1F3351] hover:bg-white"
           >
             {lang === "hu" ? "EN" : "HU"}
+          </button>
+                    {/* Logout button */}
+          <button
+            onClick={() => navigate("/login")}
+            className="rounded-lg border border-white/30 bg-[#E1860E] text-white px-3 py-1.5 text-sm font-medium hover:bg-[#cf760c] transition"
+          >
+            Logout
           </button>
         </div>
 
@@ -122,9 +127,29 @@ export default function GroupPage() {
           <aside className="space-y-3">
             <Stat label={t.members} value={group.members} />
             <Stat label={t.posts} value={posts.length} />
-            <button onClick={onCreatePost} className="w-full rounded-2xl bg-[#E1860E] text-white font-semibold px-5 py-3 shadow hover:opacity-95">
-              {t.createPost}
+            {/* Join/Leave group button */}
+            <button
+              onClick={handleJoinToggle}
+              className={`w-full rounded-2xl font-semibold px-5 py-3 shadow transition 
+                ${joined 
+                  ? "bg-[#1F3351] text-white hover:opacity-90" 
+                  : "bg-[#E1860E] text-white hover:opacity-95"}`}
+            >
+              {joined 
+                ? (lang === "hu" ? "Kilépés a csoportból" : "Leave Group") 
+                : (lang === "hu" ? "Csatlakozás a csoporthoz" : "Join Group")}
             </button>
+
+            {/* Create Post button (only visible if user joined) */}
+            {joined && (
+              <button
+                onClick={onCreatePost}
+                className="w-full rounded-2xl bg-[#E1860E] text-white font-semibold px-5 py-3 shadow hover:opacity-95"
+              >
+                {t.createPost}
+              </button>
+            )}
+
           </aside>
         </section>
 
@@ -248,3 +273,4 @@ const MOCK_GROUP_POSTS = [
   { id: "gp1", author: "Kiss Máté", createdAt: "2025-09-27", title: "TITLE-1", content: "Sziasztok! Holnap meeting a könyvtárban." },
   { id: "gp2", author: "Nagy Anna", createdAt: "2025-09-25", title: "TITLE-2", content: "Új anyagok feltöltve a Drive-ba." },
 ];
+

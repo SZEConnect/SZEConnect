@@ -39,12 +39,12 @@ export default function FaqPrivacyPage() {
       {/* Header */}
       <header className="bg-[#1F3351] text-white shadow">
         <div className="mx-auto max-w-6xl px-4 py-6 flex items-center gap-4">
-          <button
+          {/* <button
             onClick={() => navigate(-1)}
             className="hidden sm:inline rounded-lg bg-white/10 hover:bg-white/20 px-3 py-1.5"
           >
             {t.back}
-          </button>
+          </button> */}
           <div className="w-12 h-12 mr-2"><LogoShare className="w-full h-full" variant="light" /></div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">{t.title}</h1>
           <div className="ml-auto">
