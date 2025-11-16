@@ -10,16 +10,22 @@ export default function GroupPage() {
   const [posts, setPosts] = useState([]);
   const [joined, setJoined] = useState(false);
   const [hovering, setHovering] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showCreateMenu, setShowCreateMenu] = useState(false);
+
+
 
 
   const handleJoinToggle = () => setJoined(!joined);
 
   const t = useMemo(() => {
     const hu = {
+      brand: "SzeConnect",
       members: "Követők száma",
       posts: "Bejegyzések száma",
       bio: "Leírás",
       createPost: "Új bejegyzés",
+      newGroup: "Új csoport",
       postsTitle: "Bejegyzések",
       sortPopularity: "Popularitás szerint csökkenő",
       sortDate: "Bejegyzés dátuma szerint csökkenő",
@@ -31,11 +37,14 @@ export default function GroupPage() {
       back: "Vissza",
       noPosts: "Még nincs bejegyzés.",
     };
+
     const en = {
+      brand: "SzeConnect",
       members: "Followers",
       posts: "Number of posts",
       bio: "Description",
       createPost: "New Post",
+      newGroup: "New Group",
       postsTitle: "Posts",
       sortPopularity: "Sort by Popularity",
       sortDate: "Sort by Date",
@@ -47,6 +56,7 @@ export default function GroupPage() {
       back: "Back",
       noPosts: "No posts yet.",
     };
+
     return lang === "hu" ? hu : en;
   }, [lang]);
 
@@ -66,72 +76,137 @@ export default function GroupPage() {
 
   return (
     <div className="min-h-screen bg-[#FDFDFE] flex flex-col">
-      {/* HEADER – same as InterestsPage */}
-      <header className="flex items-center justify-between px-10 py-5 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <LogoShare className="w-10 h-10" />
-          <span className="text-2xl font-bold">SzeConnect</span>
-        </div>
+    {/* HEADER */}
+    <header className="flex items-center justify-between px-4 sm:px-6 md:px-10 py-4 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
+      {/* Logo + Brand (always visible) */}
+      <button
+        onClick={() => navigate("/home")}
+        className="flex items-center gap-2 sm:gap-3 focus:outline-none hover:opacity-90 transition"
+        title="Go to Home"
+      >
+        <LogoShare className="w-8 h-8 sm:w-10 sm:h-10" />
+        <span className="text-xl sm:text-2xl font-bold whitespace-nowrap">{t.brand}</span>
+      </button>
 
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
-            className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
-          >
-            {lang === "hu" ? "EN" : "HU"}
-          </button>
+      {/* Desktop buttons */}
+      <div className="hidden md:flex items-center gap-4">
+        <button
+          onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+          className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
+        >
+          {lang === "hu" ? "EN" : "HU"}
+        </button>
 
-          <button
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
-            title={t.info}
-          >
-            i
-          </button>
+        <button
+          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
+          title={t.info}
+          onClick={() => navigate("/info")}
+        >
+          i
+        </button>
 
-          <button
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
-            title={t.profile}
-            onClick={() => navigate("/profile")}
-          >
-            👤
-          </button>
+        <button
+          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
+          title={t.profile}
+          onClick={() => navigate("/profile")}
+        >
+          👤
+        </button>
 
-          <button
-            className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
-            onClick={() => navigate("/login")}
-          >
-            {t.logout}
-          </button>
-        </div>
-      </header>
+        <button
+          className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
+          onClick={() => navigate("/login")}
+        >
+          {t.logout}
+        </button>
+      </div>
+
+      {/* Mobile Hamburger */}
+      <div className="md:hidden relative">
+        <button
+          onClick={() => setMenuOpen(!menuOpen)}
+          className="w-10 h-10 rounded-md bg-[#E1860E] text-white text-2xl font-bold flex items-center justify-center shadow hover:opacity-90"
+          aria-label="Toggle menu"
+        >
+          {menuOpen ? "×" : "☰"}
+        </button>
+
+        {/* Dropdown */}
+        {menuOpen && (
+          <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
+            <button
+              onClick={() => {
+                setLang(lang === "hu" ? "en" : "hu");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+            >
+              🌐 {lang === "hu" ? "EN" : "HU"}
+            </button>
+
+            <button
+              onClick={() => {
+                navigate("/info");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+            >
+              ℹ️ {t.info}
+            </button>
+
+            <button
+              onClick={() => {
+                navigate("/profile");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+            >
+              👤 {t.profile}
+            </button>
+
+            <button
+              onClick={() => {
+                navigate("/login");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold text-[#E1860E] hover:bg-[#EDF5FA]"
+            >
+              🚪 {t.logout}
+            </button>
+          </div>
+        )}
+      </div>
+    </header>
+
+
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 px-10 py-8 space-y-8">
+      <main className="flex-1 px-4 sm:px-6 md:px-10 py-6 md:py-8 space-y-6 md:space-y-8">
         {/* Group Header */}
-        <div className="flex flex-wrap items-center justify-between gap-6">
-          <div className="flex items-center gap-6">
-            <div className="w-20 h-20 rounded-full bg-[#EDF5FA] border border-[#1F3351]/20 flex items-center justify-center overflow-hidden">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6">
+          {/* Left: avatar + name + stats */}
+          <div className="flex items-start gap-4 md:items-center md:gap-6">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full bg-[#EDF5FA] border border-[#1F3351]/20 flex items-center justify-center overflow-hidden shrink-0">
               {group.avatarUrl ? (
-                <img
-                  src={group.avatarUrl}
-                  alt="group"
-                  className="w-full h-full object-cover"
-                />
+                <img src={group.avatarUrl} alt="group" className="w-full h-full object-cover" />
               ) : (
-                <GroupIcon className="w-10 h-10" stroke="#1F3351" />
+                <GroupIcon className="w-8 h-8 sm:w-10 sm:h-10" stroke="#1F3351" />
               )}
             </div>
 
-            <div>
-              <h1 className="text-3xl font-bold text-[#1F3351]">{group.name}</h1>
+            <div className="min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-bold text-[#1F3351] leading-tight break-words">
+                {group.name}
+              </h1>
 
-              <div className="mt-3 rounded-xl border border-[#1F3351]/20 bg-[#EDF5FA] px-4 py-2 flex flex-wrap gap-8 text-[#1F3351] font-medium">
-                <span>
+              {/* Stats: stacked on mobile, inline on md+ */}
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 md:flex md:flex-wrap md:gap-4">
+                <div className="rounded-xl border border-[#1F3351]/20 bg-[#EDF5FA] px-4 py-2 text-[#1F3351] font-medium">
                   {t.members}: {group.members}
-                </span>
-                <span>
+                </div>
+                <div className="rounded-xl border border-[#1F3351]/20 bg-[#EDF5FA] px-4 py-2 text-[#1F3351] font-medium">
                   {t.posts}: {posts.length}
-                </span>
+                </div>
               </div>
             </div>
           </div>
@@ -141,35 +216,15 @@ export default function GroupPage() {
             onClick={handleJoinToggle}
             onMouseEnter={() => joined && setHovering(true)}
             onMouseLeave={() => setHovering(false)}
-            className={`flex items-center gap-2 rounded-lg px-6 py-2 font-semibold shadow transition 
-              ${joined
-                ? "bg-[#6C8EBF] text-white hover:bg-[#5A7BA5]"
-                : "bg-[#E1860E] text-white hover:bg-[#cf760c]"
-              }`}
+            className={`w-full sm:w-auto text-center rounded-lg px-6 py-2 font-semibold shadow transition
+              ${joined ? "bg-[#6C8EBF] text-white hover:bg-[#5A7BA5]" : "bg-[#E1860E] text-white hover:bg-[#cf760c]"}`}
           >
-            {joined ? (
-              <>
-                {hovering ? (lang === "hu" ? "Kilépés" : "Leave") : (lang === "hu" ? "Követve" : "Following")}
-                {!hovering && (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    className="w-4 h-4"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M16.707 5.293a1 1 0 010 1.414l-7.364 7.364a1 1 0 01-1.414 0L3.293 9.414a1 1 0 011.414-1.414L9 12.293l6.293-6.293a1 1 0 011.414 0z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                )}
-              </>
-            ) : (
-              lang === "hu" ? "Csatlakozás" : "Join Group"
-            )}
+            {joined
+              ? (hovering ? (lang === "hu" ? "Kilépés" : "Leave") : (lang === "hu" ? "Követve" : "Following"))
+              : (lang === "hu" ? "Csatlakozás" : "Join Group")}
           </button>
-        </div> {/* ✅ This was missing! */}
+        </div>
+
 
         {/* Group Description */}
         <section className="pt-4">
@@ -193,12 +248,28 @@ export default function GroupPage() {
             <button className="rounded-lg bg-[#6C8EBF] text-white px-4 py-2 text-sm font-semibold shadow hover:opacity-90">
               {t.sortDate}
             </button>
+
             <button
+              onClick={() => alert("Group report sent (mock)")}
+              className="rounded-lg bg-[#6C8EBF] text-white px-4 py-2 text-sm font-semibold shadow hover:opacity-90"
+            >
+              {lang === "hu" ? "Csoport jelentése" : "Report Group"}
+            </button>
+
+            <button
+              onClick={() => navigate(`/groups/${groupId}/edit`)}
+              className="rounded-lg bg-[#E1860E] text-white px-4 py-2 text-sm font-semibold shadow hover:opacity-90"
+            >
+              {lang === "hu" ? "Csoport szerkesztése" : "Edit Group"}
+            </button>
+
+
+            {/* <button
               onClick={onCreatePost}
               className="rounded-lg bg-[#E1860E] text-white px-5 py-2 font-semibold shadow hover:opacity-90"
             >
               {t.createPost}
-            </button>
+            </button> */}
           </div>
         </section>
 
@@ -256,10 +327,69 @@ export default function GroupPage() {
                   </h2>
                   <p className="text-[#1F3351]/90">{p.content}</p>
                 </button>
+                {/* <button
+                  onClick={() => alert("Report sent (mock)") }
+                  className="mt-3 text-sm text-red-600 hover:underline font-semibold"
+                >
+                  {lang === "hu" ? "Jelentés" : "Report"}
+                </button> */}
+
               </article>
             ))
           )}
         </section>
+        {/* FLOATING CREATE BUTTON */}
+        <div className="fixed bottom-8 right-10 flex flex-col items-end space-y-3">
+          {showCreateMenu && (
+            <>
+              <button
+              onClick={() => navigate("/groups/new")}
+              className="w-44 flex items-center justify-between rounded-full bg-[#E1860E] text-white px-6 py-2 text-sm font-semibold shadow-lg hover:opacity-95 transition-transform"
+            >
+              <span>{t.newGroup}</span>
+            </button>
+              <button
+                onClick={() => navigate("/post/new")}
+                className="w-44 flex items-center justify-between rounded-full bg-[#E1860E] text-white px-6 py-2 text-sm font-semibold shadow-lg hover:opacity-95 transition-transform"
+              >
+                <span>{t.createPost}</span>
+              </button>
+            </>
+          )}
+
+          <button
+            onClick={() => setShowCreateMenu((prev) => !prev)}
+            className="w-14 h-14 rounded-full bg-[#E1860E] text-white shadow-lg hover:opacity-95 transition-transform flex items-center justify-center"
+            aria-label="Create"
+          >
+            {showCreateMenu ? (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                className="w-7 h-7"
+                stroke="white"
+                strokeWidth="3"
+                strokeLinecap="round"
+              >
+                <line x1="6" y1="6" x2="18" y2="18" />
+                <line x1="6" y1="18" x2="18" y2="6" />
+              </svg>
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                className="w-8 h-8"
+                stroke="white"
+                strokeWidth="3"
+                strokeLinecap="round"
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            )}
+          </button>
+        </div>
+
 
       </main>
     </div>

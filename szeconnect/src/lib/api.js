@@ -1,6 +1,6 @@
 // src/lib/api.js
 // const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:4000";
+const BASE_URL = process.env.REACT_APP_API_URL || "https://gsfyl7pmfy.eu.loclx.io";
 
 
 async function request(path, { method = "GET", body, token } = {}) {

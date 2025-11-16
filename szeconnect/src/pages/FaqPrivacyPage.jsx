@@ -6,7 +6,7 @@ export default function FaqPrivacyPage() {
   const [tab, setTab] = useState("faq");
   const [q, setQ] = useState("");
   const navigate = useNavigate();
-
+  const [menuOpen, setMenuOpen] = useState(false);
   const isLoggedIn = !!localStorage.getItem("userId");
 
   const t = useMemo(() => {
@@ -39,52 +39,118 @@ export default function FaqPrivacyPage() {
   return (
     <div className="min-h-screen bg-[#FDFDFE] flex flex-col text-[#1F3351]">
       {/* HEADER */}
-      <header className="flex items-center justify-between px-10 py-5 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <LogoShare className="w-10 h-10" />
-          <span className="text-2xl font-bold">{t.brand}</span>
-        </div>
+    <header className="flex items-center justify-between px-4 sm:px-6 md:px-10 py-4 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
+      {/* Logo + Brand (always visible) */}
+      <button
+        // onClick={() => navigate("/home")}
+        className="flex items-center gap-2 sm:gap-3 focus:outline-none hover:opacity-90 transition"
+        title="Go to Home"
+      >
+        <LogoShare className="w-8 h-8 sm:w-10 sm:h-10" />
+        <span className="text-xl sm:text-2xl font-bold whitespace-nowrap">{t.brand}</span>
+      </button>
 
-        <div className="flex items-center gap-4">
-          {/* Language toggle */}
-          <button
-            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
-            className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
-          >
-            {lang === "hu" ? "EN" : "HU"}
-          </button>
+      {/* Desktop buttons */}
+      <div className="hidden md:flex items-center gap-4">
+        <button
+          onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+          className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
+        >
+          {lang === "hu" ? "EN" : "HU"}
+        </button>
+{/* 
+        <button
+          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
+          title={t.info}
+          onClick={() => navigate("/info")}
+        >
+          i
+        </button> */}
 
-          {/* Profile button only if logged in */}
-          {isLoggedIn && (
+        {/* <button
+          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
+          title={t.profile}
+          onClick={() => navigate("/profile")}
+        >
+          👤
+        </button> */}
+
+        {/* <button
+          className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
+          onClick={() => navigate("/login")}
+        >
+          {t.logout}
+        </button> */}
+      </div>
+
+      {/* Mobile Hamburger */}
+      <div className="md:hidden relative">
+        <button
+          onClick={() => setMenuOpen(!menuOpen)}
+          className="w-10 h-10 rounded-md bg-[#E1860E] text-white text-2xl font-bold flex items-center justify-center shadow hover:opacity-90"
+          aria-label="Toggle menu"
+        >
+          {menuOpen ? "×" : "☰"}
+        </button>
+
+        {/* Dropdown */}
+        {menuOpen && (
+          <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
             <button
-              onClick={() => navigate("/profile")}
-              className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
-              title={t.profile}
+              onClick={() => {
+                setLang(lang === "hu" ? "en" : "hu");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
             >
-              👤
+              🌐 {lang === "hu" ? "EN" : "HU"}
             </button>
-          )}
 
-          {/* Logout button */}
-          <button
-            className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
-            onClick={() => navigate("/login")}
-          >
-            {t.logout}
-          </button>
-        </div>
-      </header>
+            {/* <button
+              onClick={() => {
+                navigate("/info");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+            >
+              ℹ️ {t.info}
+            </button> */}
+{/* 
+            <button
+              onClick={() => {
+                navigate("/profile");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+            >
+              👤 {t.profile}
+            </button> */}
+
+            {/* <button
+              onClick={() => {
+                navigate("/login");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold text-[#E1860E] hover:bg-[#EDF5FA]"
+            >
+              🚪 {t.logout}
+            </button> */}
+          </div>
+        )}
+      </div>
+    </header>
+
 
       <div className="h-2 bg-white shadow-md z-40" />
 
       {/* MAIN AREA: Sidebar + Content */}
-      <div className="flex flex-1">
+      <div className="flex flex-1 flex-col md:flex-row">
         {/* SIDEBAR */}
-        <aside className="w-64 bg-[#6C8EBF]/90 text-white flex flex-col py-8 px-4">
-          <nav className="flex flex-col gap-3">
+        <aside className="bg-[#6C8EBF]/90 text-white flex flex-row md:flex-col items-center md:items-stretch justify-center md:justify-start gap-3 md:gap-6 py-3 md:py-8 px-2 md:px-4">
+          <nav className="flex flex-row md:flex-col w-full justify-center md:justify-start gap-3">  
             <button
               onClick={() => setTab("faq")}
-              className={`w-full text-left px-4 py-2.5 rounded-xl font-semibold transition ${
+              className={`flex-1 text-center md:text-left px-3 md:px-4 py-2.5 rounded-xl font-semibold transition ${
                 tab === "faq"
                   ? "bg-[#E9A24A] text-[#1F3351]"
                   : "hover:bg-white/10"
@@ -94,7 +160,7 @@ export default function FaqPrivacyPage() {
             </button>
             <button
               onClick={() => setTab("privacy")}
-              className={`w-full text-left px-4 py-2.5 rounded-xl font-semibold transition ${
+              className={`flex-1 text-center md:text-left px-3 md:px-4 py-2.5 rounded-xl font-semibold transition ${
                 tab === "privacy"
                   ? "bg-[#E9A24A] text-[#1F3351]"
                   : "hover:bg-white/10"
@@ -106,17 +172,17 @@ export default function FaqPrivacyPage() {
         </aside>
 
         {/* CONTENT */}
-        <main className="flex-1 p-8">
+        <main className="flex-1 p-4 sm:p-6 md:p-8">
           <div className="max-w-5xl mx-auto">
-            <h1 className="text-3xl font-extrabold mb-8 text-[#1F3351]">
+            <h1 className="text-2xl sm:text-3xl font-extrabold mb-6 sm:mb-8 text-[#1F3351] text-center md:text-left">
               {tab === "faq" ? t.faq : t.privacy}
             </h1>
 
-            <section className="rounded-2xl bg-white border border-[#1F3351]/20 shadow-sm p-6 min-h-[60vh]">
+            <section className="rounded-2xl bg-white border border-[#1F3351]/20 shadow-sm p-4 sm:p-6 min-h-[60vh]">
               {tab === "faq" ? (
                 <>
                   <input
-                    className="w-full rounded-lg border-2 border-[#F9E8C4] bg-[#FFF8E1] px-3 py-2 mb-6 outline-none focus:border-[#6C8EBF] transition"
+                    className="w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] text-[#1F3351] mb-6 placeholder:text-[#1F3351]/70 border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
                     placeholder={t.search}
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
@@ -164,6 +230,7 @@ export default function FaqPrivacyPage() {
           </div>
         </main>
       </div>
+
     </div>
   );
 }

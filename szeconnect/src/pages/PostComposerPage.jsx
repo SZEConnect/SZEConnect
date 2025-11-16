@@ -5,6 +5,8 @@ export default function PostComposerPage() {
   const navigate = useNavigate();
   const fileRef = useRef(null);
   const contentFileRef = useRef(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+
 
 
   // ── i18n ────────────────────────────────
@@ -117,7 +119,7 @@ export default function PostComposerPage() {
   const validate = () => {
     const e = {};
     if (!title.trim()) e.title = t.required;
-    if (!content.trim()) e.content = t.required;
+    // if (!content.trim()) e.content = t.required;
     if (!group) e.group = t.required;
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -137,65 +139,126 @@ export default function PostComposerPage() {
     navigate(`/groups/${group.id}`);
   };
 
-  // ── render ───────────────────────────────
+  //  render 
   return (
     <div className="min-h-screen bg-[#FDFDFE] flex flex-col">
-      {/* HEADER */}
-      <header className="flex items-center justify-between px-10 py-5 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <LogoShare className="w-10 h-10" />
-          <span className="text-2xl font-bold">{t.brand}</span>
-        </div>
+    {/* HEADER */}
+    <header className="flex items-center justify-between px-4 sm:px-6 md:px-10 py-4 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
+      {/* Logo + Brand (always visible) */}
+      <button
+        onClick={() => navigate("/home")}
+        className="flex items-center gap-2 sm:gap-3 focus:outline-none hover:opacity-90 transition"
+        title="Go to Home"
+      >
+        <LogoShare className="w-8 h-8 sm:w-10 sm:h-10" />
+        <span className="text-xl sm:text-2xl font-bold whitespace-nowrap">{t.brand}</span>
+      </button>
 
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
-            className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
-          >
-            {lang === "hu" ? "EN" : "HU"}
-          </button>
+      {/* Desktop buttons */}
+      <div className="hidden md:flex items-center gap-4">
+        <button
+          onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+          className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
+        >
+          {lang === "hu" ? "EN" : "HU"}
+        </button>
 
-          <button
-            onClick={() => navigate("/info")}
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
-            title={t.info}
-          >
-            i
-          </button>
+        <button
+          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
+          title={t.info}
+          onClick={() => navigate("/info")}
+        >
+          i
+        </button>
 
-          <button
-            onClick={() => navigate("/profile")}
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
-            title={t.profile}
-          >
-            👤
-          </button>
+        <button
+          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
+          title={t.profile}
+          onClick={() => navigate("/profile")}
+        >
+          👤
+        </button>
 
-          <button
-            onClick={() => navigate("/login")}
-            className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
-          >
-            {t.logout}
-          </button>
-        </div>
-      </header>
+        <button
+          className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
+          onClick={() => navigate("/login")}
+        >
+          {t.logout}
+        </button>
+      </div>
+
+      {/* Mobile Hamburger */}
+      <div className="md:hidden relative">
+        <button
+          onClick={() => setMenuOpen(!menuOpen)}
+          className="w-10 h-10 rounded-md bg-[#E1860E] text-white text-2xl font-bold flex items-center justify-center shadow hover:opacity-90"
+          aria-label="Toggle menu"
+        >
+          {menuOpen ? "×" : "☰"}
+        </button>
+
+        {/* Dropdown */}
+        {menuOpen && (
+          <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
+            <button
+              onClick={() => {
+                setLang(lang === "hu" ? "en" : "hu");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+            >
+              🌐 {lang === "hu" ? "EN" : "HU"}
+            </button>
+
+            <button
+              onClick={() => {
+                navigate("/info");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+            >
+              ℹ️ {t.info}
+            </button>
+
+            <button
+              onClick={() => {
+                navigate("/profile");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+            >
+              👤 {t.profile}
+            </button>
+
+            <button
+              onClick={() => {
+                navigate("/login");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold text-[#E1860E] hover:bg-[#EDF5FA]"
+            >
+              🚪 {t.logout}
+            </button>
+          </div>
+        )}
+      </div>
+    </header>
+
+
 
       {/* MAIN SECTION */}
-      <main className="flex-1 px-10 py-12">
-        <div className="max-w-6xl mx-auto px-10">
-          <h1 className="text-4xl font-bold text-[#1F3351] mb-10 text-left">
+      <main className="flex-1 px-4 sm:px-6 md:px-10 py-6 sm:py-8 md:py-12">
+        <div className="max-w-3xl md:max-w-5xl mx-auto px-4 sm:px-6">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#1F3351] mb-6 sm:mb-8 md:mb-10 text-center md:text-left">
             {t.title}
           </h1>
 
           <form
             onSubmit={onSubmit}
-            className="bg-white border border-[#1F3351]/10 rounded-2xl shadow-lg p-10 space-y-10"
+            className="bg-white border border-[#1F3351]/10 rounded-2xl shadow-lg p-5 sm:p-8 md:p-10 space-y-6 sm:space-y-8 md:space-y-10"
           >
-
-          {/*TITLE SECTION */}
-          <div className="flex flex-col md:flex-row items-center md:items-start gap-10">
-            {/* Title Input */}
-            <div className="flex-1 w-full">
+            {/* TITLE SECTION */}
+            <div>
               <label className="block font-semibold text-[#1F3351] mb-2">
                 {t.titleLabel}
               </label>
@@ -213,166 +276,154 @@ export default function PostComposerPage() {
                 <p className="text-red-600 text-sm mt-1">{errors.title}</p>
               )}
             </div>
-          </div>
 
-          {/* CONTENT SECTION */}
-          <div>
-            <label className="block font-semibold text-[#1F3351] mb-2">
-              {t.contentLabel}
-            </label>
+            {/* CONTENT SECTION */}
+            <div>
+              <label className="block font-semibold text-[#1F3351] mb-2">
+                {t.contentLabel}
+              </label>
 
-            <div
-              className={`relative rounded-xl border-2 px-4 py-3 bg-[#EDF5FA] transition ${
-                errors.content
-                  ? "border-red-500 focus:ring-red-200"
-                  : "border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
-              }`}
-            >
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder={t.contentPh}
-                rows={8}
-                className="w-full bg-transparent text-[#1F3351] outline-none pr-12 resize-none placeholder:text-[#1F3351]/70"
-              />
-
-              {/* Paperclip button */}
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-[#1F3351] text-white grid place-items-center shadow-md hover:opacity-90"
-                title={t.addImage}
-                aria-label={t.addImage}
-              >
-                <PaperclipIcon className="w-5 h-5" />
-              </button>
-
-              {/* Hidden input for images */}
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={onPickImage}
-                hidden
-              />
-            </div>
-
-            {/* Image preview under textarea */}
-            {images.length > 0 && (
-              <div className="mt-4 flex flex-wrap gap-3">
-                {images.map((img, i) => (
-                  <div
-                    key={i}
-                    className="relative w-28 h-28 rounded-lg overflow-hidden border border-[#1F3351]/20"
-                  >
-                    <img
-                      src={img.url}
-                      alt="preview"
-                      className="w-full h-full object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeImage(i)}
-                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white grid place-items-center"
-                      aria-label="remove"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-
-
-          {/* GROUP SELECT SECTION */}
-          <div ref={groupRef}>
-            <label className="block font-semibold text-[#1F3351] mb-2">
-              {t.whichGroup}
-            </label>
-
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setGroupOpen((o) => !o)}
-                className="w-full flex items-center justify-between rounded-xl border-2 border-[#1F3351]/30 bg-[#EDF5FA] px-3 py-2 text-left"
-              >
-                <span className="text-[#1F3351] font-semibold">
-                  {group?.name || t.searchGroup}
-                </span>
-                <ChevronDown
-                  className={`w-5 h-5 text-[#1F3351] transition ${
-                    groupOpen ? "rotate-180" : ""
+              <div className="relative">
+                <textarea
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder={t.contentPh}
+                  rows={6}
+                  className={`w-full rounded-xl border-2 px-4 py-3 pr-14 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] text-[#1F3351] resize-none placeholder:text-[#1F3351]/70 ${
+                    errors.content
+                      ? "border-red-500 focus:ring-red-200"
+                      : "border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
                   }`}
                 />
-              </button>
 
-              {groupOpen && (
-                <div className="absolute z-20 mt-2 w-full rounded-xl border border-[#1F3351]/20 bg-white shadow">
-                  <div className="p-2 border-b border-[#1F3351]/10">
-                    <input
-                      value={groupQuery}
-                      onChange={(e) => setGroupQuery(e.target.value)}
-                      placeholder={t.searchGroup}
-                      className="w-full rounded-md border-2 border-[#1F3351]/30 bg-[#EDF5FA] px-3 py-1.5 outline-none focus:ring-4 focus:ring-[#E1860E]/20"
-                    />
-                  </div>
+                {/* Paperclip button */}
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-[#1F3351] text-white grid place-items-center shadow-md hover:opacity-90"
+                  title={t.addImage}
+                  aria-label={t.addImage}
+                >
+                  <PaperclipIcon className="w-5 h-5" />
+                </button>
 
-                  <ul className="max-h-60 overflow-auto">
-                    {filteredGroups.map((g) => (
-                      <li key={g.id}>
-                        <button
-                          type="button"
-                          className={`w-full text-left px-3 py-2 hover:bg-[#F1F7FD] ${
-                            group?.id === g.id
-                              ? "bg-[#E8F0FB] font-semibold"
-                              : ""
-                          }`}
-                          onClick={() => {
-                            setGroup(g);
-                            setGroupOpen(false);
-                          }}
-                        >
-                          {g.name}
-                        </button>
-                      </li>
-                    ))}
-                    {filteredGroups.length === 0 && (
-                      <li className="px-3 py-2 text-[#1F3351]/60">
-                        {t.noResults}
-                      </li>
-                    )}
-                  </ul>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={onPickImage}
+                  hidden
+                />
+              </div>
+
+              {/* Image preview */}
+              {images.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-3 justify-center sm:justify-start">
+                  {images.map((img, i) => (
+                    <div
+                      key={i}
+                      className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-lg overflow-hidden border border-[#1F3351]/20"
+                    >
+                      <img
+                        src={img.url}
+                        alt="preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(i)}
+                        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white grid place-items-center"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-            {errors.group && (
-              <p className="text-red-600 text-sm mt-1">{errors.group}</p>
-            )}
-          </div>
 
-          {/* BUTTONS */}
-          <div className="flex justify-between pt-4">
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="rounded-xl bg-[#6C8EBF] text-white font-semibold px-8 py-3 shadow hover:opacity-90"
-            >
-              {t.cancel}
-            </button>
+            {/* GROUP SELECT SECTION */}
+            <div ref={groupRef}>
+              <label className="block font-semibold text-[#1F3351] mb-2">
+                {t.whichGroup}
+              </label>
 
-            <button
-              type="submit"
-              className="rounded-xl bg-[#E1860E] text-white font-semibold px-10 py-3 shadow hover:opacity-95"
-            >
-              {t.post}
-            </button>
-          </div>
-        </form>
-       </div>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setGroupOpen((o) => !o)}
+                  className="w-full flex items-center justify-between rounded-xl border-2 border-[#1F3351]/30 bg-[#EDF5FA] px-3 py-2 text-left"
+                >
+                  <span className="text-[#1F3351] font-semibold">
+                    {group?.name || t.searchGroup}
+                  </span>
+                  <ChevronDown
+                    className={`w-5 h-5 text-[#1F3351] transition ${
+                      groupOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+
+                {groupOpen && (
+                  <div className="absolute z-20 mt-2 w-full rounded-xl border border-[#1F3351]/20 bg-white shadow">
+                    <div className="p-2 border-b border-[#1F3351]/10">
+                      <input
+                        value={groupQuery}
+                        onChange={(e) => setGroupQuery(e.target.value)}
+                        placeholder={t.searchGroup}
+                        className={`mt-1 w-full rounded-xl border-2 px-4 py-2 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] ${
+                          errors.group
+                            ? "border-red-500 focus:ring-red-200"
+                            : "border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
+                        }`}
+                      />
+                    </div>
+
+                    <ul className="max-h-60 overflow-auto">
+                      {filteredGroups.map((g) => (
+                        <li key={g.id}>
+                          <button
+                            type="button"
+                            className={`w-full text-left px-3 py-2 hover:bg-[#F1F7FD] ${
+                              group?.id === g.id
+                                ? "bg-[#E8F0FB] font-semibold"
+                                : ""
+                            }`}
+                            onClick={() => {
+                              setGroup(g);
+                              setGroupOpen(false);
+                            }}
+                          >
+                            {g.name}
+                          </button>
+                        </li>
+                      ))}
+                      {filteredGroups.length === 0 && (
+                        <li className="px-3 py-2 text-[#1F3351]/60">{t.noResults}</li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+              </div>
+              {errors.group && (
+                <p className="text-red-600 text-sm mt-1">{errors.group}</p>
+              )}
+            </div>
+
+            {/* BUTTONS */}
+            <div className="flex justify-center pt-4">
+              <button
+                type="submit"
+                className="rounded-xl bg-[#E1860E] text-white font-semibold px-10 py-3 shadow hover:opacity-95 w-full sm:w-auto"
+              >
+                {t.post}
+              </button>
+            </div>
+          </form>
+        </div>
       </main>
+
     </div>
   );
 }

@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 export default function ForgotPasswordPage() {
   const [lang, setLang] = useState("hu");
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
+
 
   const t = useMemo(() => {
     const hu = {
@@ -111,27 +113,6 @@ export default function ForgotPasswordPage() {
             className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-6"
             noValidate
           >
-            {/* Email */}
-            <div>
-              <label className="block font-semibold text-[#1F3351] mb-2">
-                {t.emailLabel}
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onBlur={validate}
-                placeholder={t.emailPh}
-                className={`w-full rounded-xl border-2 px-4 py-3 bg-[#FFF9F3] text-[#1F3351] outline-none focus:ring-4 ${
-                  errors.email
-                    ? "border-red-600 ring-red-100"
-                    : "border-[#E1860E]/40 focus:ring-[#E1860E]/20"
-                }`}
-              />
-              {errors.email && (
-                <p className="text-red-600 text-sm mt-1">{errors.email}</p>
-              )}
-            </div>
 
             {/* Neptun */}
             <div>
@@ -143,15 +124,40 @@ export default function ForgotPasswordPage() {
                 onChange={(e) => setNeptun(e.target.value.toUpperCase())}
                 onBlur={validate}
                 placeholder={t.neptunPh}
-                className={`w-full rounded-xl border-2 px-4 py-3 bg-[#FFF9F3] text-[#1F3351] uppercase tracking-wider outline-none focus:ring-4 ${
+                className={`w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] text-[#1F3351] uppercase tracking-wider placeholder:text-[#1F3351]/70 ${
                   errors.neptun
-                    ? "border-red-600 ring-red-100"
-                    : "border-[#E1860E]/40 focus:ring-[#E1860E]/20"
+                    ? "border-red-500 focus:ring-red-200"
+                    : "border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
                 }`}
                 maxLength={6}
               />
+
               {errors.neptun && (
                 <p className="text-red-600 text-sm mt-1">{errors.neptun}</p>
+              )}
+            </div>
+
+
+            {/* Email */}
+            <div>
+              <label className="block font-semibold text-[#1F3351] mb-2">
+                {t.emailLabel}
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onBlur={validate}
+                placeholder={t.emailPh}
+                className={`w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] text-[#1F3351] placeholder:text-[#1F3351]/70 ${
+                  errors.email
+                    ? "border-red-500 focus:ring-red-200"
+                    : "border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
+                }`}
+              />
+
+              {errors.email && (
+                <p className="text-red-600 text-sm mt-1">{errors.email}</p>
               )}
             </div>
 
@@ -174,14 +180,14 @@ export default function ForgotPasswordPage() {
                   {notice}
                 </p>
               )}
-
+{/* 
               <button
                 type="button"
                 onClick={() => navigate("/login")}
                 className="mt-6 rounded-xl bg-[#6C8EBF] text-white px-6 py-2 font-semibold shadow hover:opacity-95"
               >
                 {t.back}
-              </button>
+              </button> */}
             </div>
           </form>
         </div>

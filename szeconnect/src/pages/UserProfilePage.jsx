@@ -2,6 +2,170 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 
+const PROGRAM_LIST = (lang) => {
+    const hu = [
+      { group: "Alapképzés – Agrár", options: [
+        "Agrár- és üzleti digitalizáció BSc","Állattenyésztő mérnöki BSc","Élelmiszermérnöki BSc",
+        "Gazdasági és vidékfejlesztési agrármérnöki BSc","Mezőgazdasági és élelmiszeripari gépészmérnöki BSc",
+        "Mezőgazdasági mérnöki BSc","Mezőgazdasági vízgazdálkodási és környezettechnológiai mérnöki BSc",
+      ]},
+      { group: "Alapképzés – Jogi", options: [
+        "Igazságügyi igazgatási BA","Személyügyi, munkaügyi és szociális igazgatási BA",
+      ]},
+      { group: "Alapképzés – Gazdasági", options: [
+        "Gazdálkodás és menedzsment BSc","Kereskedelem és marketing BSc","Nemzetközi gazdálkodás BSc","Turizmus-vendéglátás BSc",
+      ]},
+      { group: "Alapképzés – Informatikai", options: [
+        "Gazdaságinformatikus BSc","Mérnökinformatikus BSc","Programtervező informatikus BSc",
+      ]},
+      { group: "Alapképzés – Egészségügyi", options: [
+        "Ápolás és betegellátás BSc","Egészségügyi gondozás és prevenció BSc","Egészségügyi szervező BSc",
+      ]},
+      { group: "Alapképzés – Műszaki", options: [
+        "Építészmérnöki BSc","Építőmérnöki BSc","Gépészmérnöki BSc","Járműmérnöki BSc","Környezetmérnöki BSc",
+        "Közlekedésmérnöki BSc","Logisztikai mérnöki BSc","Mechatronikai mérnöki BSc","Műszaki menedzser BSc","Villamosmérnöki BSc",
+      ]},
+      { group: "Alapképzés – Művészeti", options: [
+        "Előadó-művészet BA","Építőművészet BA","Formatervezés BA","Tervezőgrafika BA",
+      ]},
+      { group: "Alapképzés – Pedagógia", options: ["Gyógypedagógia BA","Szakoktató BA","Tanító BA"] },
+      { group: "Alapképzés – Sporttudomány", options: ["Rekreáció és életmód BSc"] },
+      { group: "Alapképzés – Társadalomtudomány", options: [
+        "Nemzetközi tanulmányok BA","Szociális munka BA","Szociálpedagógia BA","Szociológia BA",
+      ]},
+      { group: "Alapképzés – Bölcsészettudományi", options: ["Közösségszervezés BA"] },
+
+      { group: "Mesterképzés – Agrár", options: [
+        "Állattenyésztő mérnöki MSc","Élelmiszerbiztonsági és -minőségi mérnöki MSc","Környezetgazdálkodási agrármérnöki MSc",
+        "Növényorvosi MSc","Mezőgazdasági biotechnológus MSc","Mezőgazdasági vízgazdálkodási mérnöki MSc","Vidékfejlesztési agrármérnöki MSc",
+      ]},
+      { group: "Mesterképzés – Pedagógia", options: [
+        "Agrármérnök tanár MSc","Tanári (mérnöktanár) MA","Tanári (zenetanár) MA","Tanári (zeneművésztanár) MA",
+      ]},
+      { group: "Mesterképzés – Gazdasági", options: [
+        "Agrárközgazdász MSc","Ellátásilánc menedzsment MSc","Marketing MSc","Nemzetközi gazdaság és gazdálkodás MSc",
+        "Regionális és környezeti gazdaságtan MSc","Vezetés és szervezés MSc","Turizmus-menedzsment MSc",
+      ]},
+      { group: "Mesterképzés – Egészségügyi", options: [
+        "Egészségügyi menedzser MSc","Szülészeti-nőgyógyászati szonográfia MSc","Egészségpszichológia MSc",
+        "Táplálkozástudományi MSc","Szülésznő MSc",
+      ]},
+      { group: "Mesterképzés – Informatika", options: [
+        "Gazdaságinformatikus MSc","Mérnökinformatikus MSc","Programtervező informatikus MSc",
+      ]},
+      { group: "Mesterképzés – Bölcsész", options: [
+        "Emberi erőforrás tanácsadó MA","Gyermekkultúra MA","Kulturális mediáció MA",
+      ]},
+      { group: "Mesterképzés – Műszaki", options: [
+        "ESG – környezeti, társadalmi és irányítási szakember MSc","Építész MSc","Gépészmérnöki MSc",
+        "Infrastruktúra-építőmérnöki MSc","Járműmérnöki MSc","Közlekedésmérnöki MSc","Logisztikai mérnöki MSc",
+        "Mechatronikai mérnöki MSc","Motorsportmérnök MSc","Műszaki menedzser MSc","Szerkezet-építőmérnöki MSc",
+        "Településmérnöki MSc","Villamosmérnöki MSc",
+      ]},
+      { group: "Mesterképzés – Művészeti", options: [
+        "Építőművészet MA","Formatervező művész MA","Klasszikus hangszerművész MA","Karmester MA","Tervezőgrafika MA",
+      ]},
+      { group: "Mesterképzés – Jogi", options: [
+        "Modern technológiák és kiberbiztonság joga MA","Személyügyi, munkaügyi és szociális igazgatási MA",
+      ]},
+      { group: "Mesterképzés – Társadalomtudomány", options: [
+        "Közösségi és civil tanulmányok MA","Gondoskodáspolitikai tanulmányok MA",
+      ]},
+
+      { group: "Felsőoktatási szakképzés (FOSZK) – Agrár", options: ["Mezőgazdasági FOSZK","Ménesgazda FOSZK"] },
+      { group: "Felsőoktatási szakképzés (FOSZK) – Jogi", options: ["Jogi FOSZK"] },
+      { group: "Felsőoktatási szakképzés (FOSZK) – Gazdasági", options: [
+        "Gazdálkodás és menedzsment FOSZK","Kereskedelem és marketing FOSZK","Turizmus-vendéglátás FOSZK",
+      ]},
+
+      { group: "Osztatlan képzések – Agrár", options: ["Agrármérnöki"] },
+      { group: "Osztatlan képzések – Jogi", options: ["Jogász"] },
+      { group: "Osztatlan képzések – Műszaki", options: ["Építészmérnöki"] },
+      { group: "Osztatlan képzések – Pedagógiai", options: ["Tanári (mérnöktanár)","Tanári (zenetanár)"] },
+    ];
+
+    const en = [
+      { group: "Bachelor – Agriculture", options: [
+        "Agricultural and Business Digitalization BSc","Animal Breeding Engineering BSc","Food Engineering BSc",
+        "Agricultural Economics and Rural Development Engineering BSc","Agricultural and Food Industry Mechanical Engineering BSc",
+        "Agricultural Engineering BSc","Agricultural Water Management and Environmental Technology Engineering BSc",
+      ]},
+      { group: "Bachelor – Law", options: [
+        "Judicial Administration BA","Human Resources, Labour and Social Administration BA",
+      ]},
+      { group: "Bachelor – Economics", options: [
+        "Business and Management BSc","Commerce and Marketing BSc","International Business BSc","Tourism and Catering BSc",
+      ]},
+      { group: "Bachelor – IT", options: [
+        "Business Informatics BSc","Computer Engineering BSc","Software Engineering BSc",
+      ]},
+      { group: "Bachelor – Health", options: [
+        "Nursing and Patient Care BSc","Health Care and Prevention BSc","Health Care Management BSc",
+      ]},
+      { group: "Bachelor – Engineering", options: [
+        "Architecture BSc","Civil Engineering BSc","Mechanical Engineering BSc","Vehicle Engineering BSc",
+        "Environmental Engineering BSc","Transport Engineering BSc","Logistics Engineering BSc",
+        "Mechatronics Engineering BSc","Engineering Management BSc","Electrical Engineering BSc",
+      ]},
+      { group: "Bachelor – Arts", options: [
+        "Performing Arts BA","Architectural Arts BA","Design BA","Graphic Design BA",
+      ]},
+      { group: "Bachelor – Education", options: [
+        "Special Education BA","Vocational Teacher BA","Primary School Teacher BA",
+      ]},
+      { group: "Bachelor – Sport Science", options: ["Recreation and Lifestyle BSc"] },
+      { group: "Bachelor – Social Sciences", options: [
+        "International Relations BA","Social Work BA","Social Pedagogy BA","Sociology BA",
+      ]},
+      { group: "Bachelor – Humanities", options: ["Community Organization BA"] },
+
+      { group: "Master – Agriculture", options: [
+        "Animal Breeding Engineering MSc","Food Safety and Quality Engineering MSc",
+        "Agricultural Environmental Management Engineering MSc","Plant Protection MSc",
+        "Agricultural Biotechnology MSc","Agricultural Water Management Engineering MSc","Rural Development Agricultural Engineering MSc",
+      ]},
+      { group: "Master – Education", options: [
+        "Agricultural Engineering Teacher MSc","Teacher (Engineering Teacher) MA","Teacher (Music Teacher) MA","Teacher (Music Artist Teacher) MA",
+      ]},
+      { group: "Master – Economics", options: [
+        "Agricultural Economics MSc","Supply Chain Management MSc","Marketing MSc","International Economy and Business MSc",
+        "Regional and Environmental Economics MSc","Management and Leadership MSc","Tourism Management MSc",
+      ]},
+      { group: "Master – Health", options: [
+        "Health Care Manager MSc","Obstetrics and Gynecology Sonography MSc","Health Psychology MSc","Nutrition Science MSc","Midwifery MSc",
+      ]},
+      { group: "Master – IT", options: ["Business Informatics MSc","Computer Engineering MSc","Software Engineering MSc"] },
+      { group: "Master – Humanities", options: ["Human Resource Counselling MA","Children’s Culture MA","Cultural Mediation MA"] },
+      { group: "Master – Engineering", options: [
+        "ESG – Environmental, Social and Governance Specialist MSc","Architecture MSc","Mechanical Engineering MSc",
+        "Infrastructure Civil Engineering MSc","Vehicle Engineering MSc","Transport Engineering MSc","Logistics Engineering MSc",
+        "Mechatronics Engineering MSc","Motorsport Engineering MSc","Engineering Management MSc",
+        "Structural Civil Engineering MSc","Urban Engineering MSc","Electrical Engineering MSc",
+      ]},
+      { group: "Master – Arts", options: [
+        "Architectural Arts MA","Design MA","Classical Instrumental Artist MA","Conductor MA","Graphic Design MA",
+      ]},
+      { group: "Master – Law", options: [
+        "Law of Modern Technologies and Cybersecurity MA","Human Resources, Labour and Social Administration MA",
+      ]},
+      { group: "Master – Social Sciences", options: [
+        "Community and Civil Studies MA","Care Policy Studies MA",
+      ]},
+
+      { group: "HE Vocational (FOSZK) – Agriculture", options: ["Agriculture FOSZK","Stud Farm Manager FOSZK"] },
+      { group: "HE Vocational (FOSZK) – Law", options: ["Legal Studies FOSZK"] },
+      { group: "HE Vocational (FOSZK) – Economics", options: [
+        "Business and Management FOSZK","Commerce and Marketing FOSZK","Tourism and Catering FOSZK",
+      ]},
+
+      { group: "Undivided – Agriculture", options: ["Agricultural Engineering"] },
+      { group: "Undivided – Law", options: ["Law"] },
+      { group: "Undivided – Engineering", options: ["Architectural Engineering"] },
+      { group: "Undivided – Education", options: ["Teacher (Engineering Teacher)","Teacher (Music Teacher)"] },
+    ];
+    return lang === "hu" ? hu : en;
+  };
+
 export default function UserProfilePage() {
   const { userId } = useParams();
   const navigate = useNavigate();
@@ -12,6 +176,11 @@ export default function UserProfilePage() {
   const [editMode, setEditMode] = useState(false);
   const [editableUser, setEditableUser] = useState(null);
   const [showCreateMenu, setShowCreateMenu] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+
+// PROGRAM LIST (same as RegisterPage)
+const programs = useMemo(() => PROGRAM_LIST(lang), [lang]);
 
 
 
@@ -56,6 +225,7 @@ const isOwnProfile = !userId || userId === currentUserId;
 
   const t = useMemo(() => {
     const hu = {
+      brand: "SzeConnect",
       firstName: "Keresztnév",
       lastName: "Vezetéknév",
       username: "Felhasználónév",
@@ -73,9 +243,12 @@ const isOwnProfile = !userId || userId === currentUserId;
       info: "Információ",
       profile: "Profil",
       postCount: "Bejegyzések száma",
-
+      createPost: "Új bejegyzés",
+      newGroup: "Új csoport",
     };
+
     const en = {
+      brand: "SzeConnect",
       firstName: "First Name",
       lastName: "Last Name",
       username: "Username",
@@ -93,8 +266,10 @@ const isOwnProfile = !userId || userId === currentUserId;
       info: "Information",
       profile: "Profile",
       postCount: "Number of posts",
-
+      createPost: "Új bejegyzés",
+      newGroup: "Új csoport",
     };
+
 
     return lang === "hu" ? hu : en;
   }, [lang]);
@@ -105,44 +280,108 @@ const isOwnProfile = !userId || userId === currentUserId;
   return (
     <div className="min-h-screen bg-[#FDFDFE] flex flex-col">
       {/* HEADER */}
-      <header className="flex items-center justify-between px-10 py-5 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <LogoShare className="w-10 h-10" />
-          <span className="text-2xl font-bold">SzeConnect</span>
-        </div>
+    <header className="flex items-center justify-between px-4 sm:px-6 md:px-10 py-4 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
+      {/* Logo + Brand (always visible) */}
+      <button
+        onClick={() => navigate("/home")}
+        className="flex items-center gap-2 sm:gap-3 focus:outline-none hover:opacity-90 transition"
+        title="Go to Home"
+      >
+        <LogoShare className="w-8 h-8 sm:w-10 sm:h-10" />
+        <span className="text-xl sm:text-2xl font-bold whitespace-nowrap">{t.brand}</span>
+      </button>
 
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
-            className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
-          >
-            {lang === "hu" ? "EN" : "HU"}
-          </button>
+      {/* Desktop buttons */}
+      <div className="hidden md:flex items-center gap-4">
+        <button
+          onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+          className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
+        >
+          {lang === "hu" ? "EN" : "HU"}
+        </button>
 
-          <button
-            onClick = {() => navigate("/info")}
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
-            title={t.info}
-          >
-            i
-          </button>
+        <button
+          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
+          title={t.info}
+          onClick={() => navigate("/info")}
+        >
+          i
+        </button>
 
-          <button
-            onClick={() => navigate("/users/:userId")}
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
-            title={t.profile}
-          >
-            👤
-          </button>
+        <button
+          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
+          title={t.profile}
+          onClick={() => navigate("/profile")}
+        >
+          👤
+        </button>
 
-          <button
-            onClick={() => navigate("/login")}
-            className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
-          >
-            {t.logout}
-          </button>
-        </div>
-      </header>
+        <button
+          className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
+          onClick={() => navigate("/login")}
+        >
+          {t.logout}
+        </button>
+      </div>
+
+      {/* Mobile Hamburger */}
+      <div className="md:hidden relative">
+        <button
+          onClick={() => setMenuOpen(!menuOpen)}
+          className="w-10 h-10 rounded-md bg-[#E1860E] text-white text-2xl font-bold flex items-center justify-center shadow hover:opacity-90"
+          aria-label="Toggle menu"
+        >
+          {menuOpen ? "×" : "☰"}
+        </button>
+
+        {/* Dropdown */}
+        {menuOpen && (
+          <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
+            <button
+              onClick={() => {
+                setLang(lang === "hu" ? "en" : "hu");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+            >
+              🌐 {lang === "hu" ? "EN" : "HU"}
+            </button>
+
+            <button
+              onClick={() => {
+                navigate("/info");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+            >
+              ℹ️ {t.info}
+            </button>
+
+            <button
+              onClick={() => {
+                navigate("/profile");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+            >
+              👤 {t.profile}
+            </button>
+
+            <button
+              onClick={() => {
+                navigate("/login");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold text-[#E1860E] hover:bg-[#EDF5FA]"
+            >
+              🚪 {t.logout}
+            </button>
+          </div>
+        )}
+      </div>
+    </header>
+
+
 
       {/* MAIN CONTENT */}
       <main className="flex-1 px-10 py-8 space-y-8">
@@ -267,7 +506,7 @@ const isOwnProfile = !userId || userId === currentUserId;
                 onChange={(e) =>
                   setEditableUser({ ...editableUser, firstName: e.target.value })
                 }
-                className="w-full rounded-lg border border-[#1F3351]/30 p-2"
+                className="w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] text-[#1F3351] placeholder:text-[#1F3351]/70 border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
               />
             ) : (
               <span className="font-medium">{user.firstName || "—"}</span>
@@ -283,7 +522,7 @@ const isOwnProfile = !userId || userId === currentUserId;
                 onChange={(e) =>
                   setEditableUser({ ...editableUser, lastName: e.target.value })
                 }
-                className="w-full rounded-lg border border-[#1F3351]/30 p-2"
+                className="w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] text-[#1F3351] placeholder:text-[#1F3351]/70 border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
               />
             ) : (
               <span className="font-medium">{user.lastName || "—"}</span>
@@ -300,7 +539,7 @@ const isOwnProfile = !userId || userId === currentUserId;
                 onChange={(e) =>
                   setEditableUser({ ...editableUser, username: e.target.value })
                 }
-                className="w-full rounded-lg border border-[#1F3351]/30 p-2"
+                className="w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] text-[#1F3351] placeholder:text-[#1F3351]/70 border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
               />
             ) : (
               <span className="font-medium">{user.username || "—"}</span>
@@ -309,8 +548,32 @@ const isOwnProfile = !userId || userId === currentUserId;
 
           <div>
             <label className="font-bold block mb-1">{t.program}:</label>
-            <span className="font-medium">{user.program || "—"}</span>
+
+            {editMode ? (
+              <select
+                value={editableUser.program || ""}
+                onChange={(e) =>
+                  setEditableUser({ ...editableUser, program: e.target.value })
+                }
+                className="w-full rounded-xl border-2 px-4 py-3 text-base bg-[#EDF5FA] border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-4 focus:ring-[#E1860E]/30 text-[#1F3351]"
+              >
+                <option value="">
+                  {lang === "hu" ? "Válassz szakot…" : "Select a major…"}
+                </option>
+
+                {programs.map((grp) => (
+                  <optgroup key={grp.group} label={grp.group}>
+                    {grp.options.map((op) => (
+                      <option key={op} value={op}>{op}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            ) : (
+              <span className="font-medium">{user.program || "—"}</span>
+            )}
           </div>
+
 
           {/* Dropdown helpers */}
           {(() => {
@@ -329,57 +592,14 @@ const isOwnProfile = !userId || userId === currentUserId;
                 {/* Row 3: Start year / Birth year */}
                 <div>
                   <label className="font-bold block mb-1">{t.started}:</label>
-                  {editMode ? (
-                    <select
-                      value={editableUser.startYear || ""}
-                      onChange={(e) =>
-                        setEditableUser({
-                          ...editableUser,
-                          startYear: e.target.value,
-                        })
-                      }
-                      className="w-full rounded-lg border border-[#1F3351]/30 p-2 bg-white"
-                    >
-                      <option value="">
-                        {lang === "hu" ? "Válassz évet..." : "Select year..."}
-                      </option>
-                      {startYears.map((y) => (
-                        <option key={y} value={y}>
-                          {y}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span className="font-medium">{user.startYear || "—"}</span>
-                  )}
+                  <span className="font-medium">{user.startYear || "—"}</span>
                 </div>
 
                 <div>
                   <label className="font-bold block mb-1">{t.birthYear}:</label>
-                  {editMode ? (
-                    <select
-                      value={editableUser.birthYear || ""}
-                      onChange={(e) =>
-                        setEditableUser({
-                          ...editableUser,
-                          birthYear: e.target.value,
-                        })
-                      }
-                      className="w-full rounded-lg border border-[#1F3351]/30 p-2 bg-white"
-                    >
-                      <option value="">
-                        {lang === "hu" ? "Válassz évet..." : "Select year..."}
-                      </option>
-                      {birthYears.map((y) => (
-                        <option key={y} value={y}>
-                          {y}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span className="font-medium">{user.birthYear || "—"}</span>
-                  )}
+                  <span className="font-medium">{user.birthYear || "—"}</span>
                 </div>
+
 
                 {/* Row 4: Password / Confirm password (only in edit mode) */}
                 {editMode && (
@@ -398,7 +618,7 @@ const isOwnProfile = !userId || userId === currentUserId;
                             password: e.target.value,
                           })
                         }
-                        className="w-full rounded-lg border border-[#1F3351]/30 p-2"
+                        className="w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] text-[#1F3351] placeholder:text-[#1F3351]/70 border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
                       />
                     </div>
 
@@ -419,7 +639,7 @@ const isOwnProfile = !userId || userId === currentUserId;
                             confirmPassword: e.target.value,
                           })
                         }
-                        className="w-full rounded-lg border border-[#1F3351]/30 p-2"
+                        className="w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] text-[#1F3351] placeholder:text-[#1F3351]/70 border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
                       />
                     </div>
                   </>
@@ -539,34 +759,58 @@ const isOwnProfile = !userId || userId === currentUserId;
 
       </main>
 
-      {/* FLOATING CREATE BUTTON – orange, expandable menu */}
-      <div className="fixed bottom-8 right-10 flex flex-col items-end space-y-3 z-50">
-        {showCreateMenu && (
-          <>
-            <button
+        {/* FLOATING CREATE BUTTON */}
+        <div className="fixed bottom-8 right-10 flex flex-col items-end space-y-3">
+          {showCreateMenu && (
+            <>
+              <button
               onClick={() => navigate("/groups/new")}
               className="w-44 flex items-center justify-between rounded-full bg-[#E1860E] text-white px-6 py-2 text-sm font-semibold shadow-lg hover:opacity-95 transition-transform"
             >
-              <span>{lang === "hu" ? "Új csoport" : "New Group"}</span>
+              <span>{t.newGroup}</span>
             </button>
+              <button
+                onClick={() => navigate("/post/new")}
+                className="w-44 flex items-center justify-between rounded-full bg-[#E1860E] text-white px-6 py-2 text-sm font-semibold shadow-lg hover:opacity-95 transition-transform"
+              >
+                <span>{t.createPost}</span>
+              </button>
+            </>
+          )}
 
-            <button
-              onClick={() => navigate("/post/new")}
-              className="w-44 flex items-center justify-between rounded-full bg-[#E1860E] text-white px-6 py-2 text-sm font-semibold shadow-lg hover:opacity-95 transition-transform"
-            >
-              <span>{lang === "hu" ? "Új bejegyzés" : "New Post"}</span>
-            </button>
-          </>
-        )}
+          <button
+            onClick={() => setShowCreateMenu((prev) => !prev)}
+            className="w-14 h-14 rounded-full bg-[#E1860E] text-white shadow-lg hover:opacity-95 transition-transform flex items-center justify-center"
+            aria-label="Create"
+          >
+            {showCreateMenu ? (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                className="w-7 h-7"
+                stroke="white"
+                strokeWidth="3"
+                strokeLinecap="round"
+              >
+                <line x1="6" y1="6" x2="18" y2="18" />
+                <line x1="6" y1="18" x2="18" y2="6" />
+              </svg>
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                className="w-8 h-8"
+                stroke="white"
+                strokeWidth="3"
+                strokeLinecap="round"
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            )}
+          </button>
+        </div>
 
-        <button
-          onClick={() => setShowCreateMenu((prev) => !prev)}
-          className="w-14 h-14 rounded-full bg-[#E1860E] text-white text-3xl shadow-lg hover:opacity-95 transition-transform"
-          aria-label="Create"
-        >
-          {showCreateMenu ? "×" : "+"}
-        </button>
-      </div>
 
     </div>
   );

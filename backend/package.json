@@ -2,15 +2,16 @@
   "name": "projektmunka",
   "version": "1.0.0",
   "description": "Authentication backend for SzeConnect",
-  "main": "index.js",
+  "type": "module",
+  "main": "test-index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node index.js",
+    "start": "node test-index.js",
+    "dev": "node test-index.js",
     "test:register": "node test-registration.js",
     "test:auth": "node testauth.js",
     "test:all": "npm run test:register && npm run test:auth",
-    "watch": "nodemon index.js",
-    "dev:watch": "nodemon index.js"
+    "watch": "nodemon test-index.js",
+    "dev:watch": "nodemon test-index.js"
   },
   "keywords": [
     "authentication",
@@ -26,9 +27,11 @@
     "bcrypt": "^5.1.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.0",
+    "ejs": "^3.1.10",
     "express": "^4.18.0",
     "jsonwebtoken": "^9.0.0",
-    "nodemailer": "^7.0.9"
+    "mysql2": "^3.15.3",
+    "nodemailer": "^7.0.6"
   },
   "devDependencies": {
     "nodemon": "^3.0.0"

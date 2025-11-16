@@ -1,10 +1,15 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
+
 export default function SearchResultsPage() {
   const [lang, setLang] = useState("hu");
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showCreateMenu, setShowCreateMenu] = useState(false);
+
+
 
   const [q, setQ] = useState(params.get("q") || "");
 
@@ -19,6 +24,8 @@ export default function SearchResultsPage() {
       info: "Információ",
       profile: "Profil",
       logout: "Kijelentkezés",
+      createPost: "Új bejegyzés",
+      newGroup: "Új csoport",
     };
     const en = {
       brand: "SzeConnect",
@@ -30,6 +37,8 @@ export default function SearchResultsPage() {
       info: "Information",
       profile: "Profile",
       logout: "Logout",
+      createPost: "New Post",
+      newGroup: "New Group",
     };
     return lang === "hu" ? hu : en;
   }, [lang]);
@@ -61,46 +70,107 @@ export default function SearchResultsPage() {
   return (
     <div className="min-h-screen flex flex-col bg-[#FAFBFD] text-[#1F3351]">
       {/* HEADER */}
-      <header className="flex items-center justify-between px-10 py-5 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <LogoShare className="w-10 h-10" />
-          <span className="text-2xl font-bold">{t.brand}</span>
-        </div>
+ <header className="flex items-center justify-between px-4 sm:px-6 md:px-10 py-4 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
+      {/* Logo + Brand (always visible) */}
+      <button
+        onClick={() => navigate("/home")}
+        className="flex items-center gap-2 sm:gap-3 focus:outline-none hover:opacity-90 transition"
+        title="Go to Home"
+      >
+        <LogoShare className="w-8 h-8 sm:w-10 sm:h-10" />
+        <span className="text-xl sm:text-2xl font-bold whitespace-nowrap">{t.brand}</span>
+      </button>
 
-        <div className="flex items-center gap-4">
-          {/* Language toggle */}
-          <button
-            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
-            className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
-          >
-            {lang === "hu" ? "EN" : "HU"}
-          </button>
+      {/* Desktop buttons */}
+      <div className="hidden md:flex items-center gap-4">
+        <button
+          onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+          className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
+        >
+          {lang === "hu" ? "EN" : "HU"}
+        </button>
 
-          {/* Info */}
-          <button
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
-            title={t.info}
-          >
-            i
-          </button>
+        <button
+          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
+          title={t.info}
+          onClick={() => navigate("/info")}
+        >
+          i
+        </button>
 
-          {/* Profile */}
-          <button
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
-            title={t.profile}
-          >
-            👤
-          </button>
+        <button
+          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
+          title={t.profile}
+          onClick={() => navigate("/profile")}
+        >
+          👤
+        </button>
 
-          {/* Logout */}
-          <button
-            className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
-            onClick={() => navigate("/login")}
-          >
-            {t.logout}
-          </button>
-        </div>
-      </header>
+        <button
+          className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
+          onClick={() => navigate("/login")}
+        >
+          {t.logout}
+        </button>
+      </div>
+
+      {/* Mobile Hamburger */}
+      <div className="md:hidden relative">
+        <button
+          onClick={() => setMenuOpen(!menuOpen)}
+          className="w-10 h-10 rounded-md bg-[#E1860E] text-white text-2xl font-bold flex items-center justify-center shadow hover:opacity-90"
+          aria-label="Toggle menu"
+        >
+          {menuOpen ? "×" : "☰"}
+        </button>
+
+        {/* Dropdown */}
+        {menuOpen && (
+          <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
+            <button
+              onClick={() => {
+                setLang(lang === "hu" ? "en" : "hu");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+            >
+              🌐 {lang === "hu" ? "EN" : "HU"}
+            </button>
+
+            <button
+              onClick={() => {
+                navigate("/info");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+            >
+              ℹ️ {t.info}
+            </button>
+
+            <button
+              onClick={() => {
+                navigate("/profile");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+            >
+              👤 {t.profile}
+            </button>
+
+            <button
+              onClick={() => {
+                navigate("/login");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold text-[#E1860E] hover:bg-[#EDF5FA]"
+            >
+              🚪 {t.logout}
+            </button>
+          </div>
+        )}
+      </div>
+    </header>
+
 
       {/* CONTENT */}
       <main className="flex-1 px-10 py-12">
@@ -114,14 +184,14 @@ export default function SearchResultsPage() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder={t.searchPh}
-              className="flex-1 rounded-xl border-2 border-[#E6A756]/40 bg-[#FFF9F4] px-5 py-3 text-[#1F3351] focus:border-[#E6A756] focus:ring-4 focus:ring-[#E6A756]/30 outline-none transition"
+              className="flex-1 rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] text-[#1F3351] placeholder:text-[#1F3351]/70 border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
             />
-            <button
+            {/* <button
               type="submit"
               className="rounded-xl bg-[#E6A756] text-white font-semibold px-6 py-3 shadow hover:opacity-90"
             >
               🔍
-            </button>
+            </button> */}
           </form>
 
           {/* RESULTS */}
@@ -166,6 +236,57 @@ export default function SearchResultsPage() {
               )}
             </section>
           </div>
+        </div>
+                {/* FLOATING CREATE BUTTON */}
+        <div className="fixed bottom-8 right-10 flex flex-col items-end space-y-3">
+          {showCreateMenu && (
+            <>
+              <button
+              onClick={() => navigate("/groups/new")}
+              className="w-44 flex items-center justify-between rounded-full bg-[#E1860E] text-white px-6 py-2 text-sm font-semibold shadow-lg hover:opacity-95 transition-transform"
+            >
+              <span>{t.newGroup}</span>
+            </button>
+              <button
+                onClick={() => navigate("/post/new")}
+                className="w-44 flex items-center justify-between rounded-full bg-[#E1860E] text-white px-6 py-2 text-sm font-semibold shadow-lg hover:opacity-95 transition-transform"
+              >
+                <span>{t.createPost}</span>
+              </button>
+            </>
+          )}
+
+          <button
+            onClick={() => setShowCreateMenu((prev) => !prev)}
+            className="w-14 h-14 rounded-full bg-[#E1860E] text-white shadow-lg hover:opacity-95 transition-transform flex items-center justify-center"
+            aria-label="Create"
+          >
+            {showCreateMenu ? (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                className="w-7 h-7"
+                stroke="white"
+                strokeWidth="3"
+                strokeLinecap="round"
+              >
+                <line x1="6" y1="6" x2="18" y2="18" />
+                <line x1="6" y1="18" x2="18" y2="6" />
+              </svg>
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                className="w-8 h-8"
+                stroke="white"
+                strokeWidth="3"
+                strokeLinecap="round"
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            )}
+          </button>
         </div>
       </main>
     </div>

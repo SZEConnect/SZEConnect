@@ -6,6 +6,7 @@ export default function RegisterPage() {
   const [lang, setLang] = useState("hu");
   const navigate = useNavigate();
   const onInfo = () => navigate("/info");
+  const [menuOpen, setMenuOpen] = useState(false);
 
 
   const t = useMemo(() => {
@@ -397,7 +398,6 @@ export default function RegisterPage() {
     };
 
     try {
-      // If your backend expects multipart/form-data for the image, use this:
       // if (profileFile) {
       //   const fd = new FormData();
       //   Object.entries(payload).forEach(([k, v]) => {
@@ -494,21 +494,9 @@ export default function RegisterPage() {
               />
             </Field>
 
-            {/* Email */}
-            <Field label={`${t.email}${t.requiredMark}`} error={errors.email}>
-              <input
-                className={inputCls(errors.email)}
-                value={form.email}
-                onChange={(e) => onChange("email", e.target.value)}
-                placeholder={t.placeholders.email}
-                type="email"
-                autoComplete="email"
-              />
-            </Field>
-
             {/* Password */}
             <Field label={`${t.password}${t.requiredMark}`} error={errors.password}>
-              <div className="relative">
+              <div className="relative flex items-center">
                 <input
                   type={showPassword ? "text" : "password"}
                   className={inputCls(errors.password) + " pr-10"}
@@ -520,34 +508,46 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-[#1F3351]/70 text-xl font-bold"
-                  aria-label="Toggle password visibility"
+                  className="absolute right-3 text-[#1F3351]/70 text-xl font-bold"
                 >
                   {showPassword ? "◠" : "◉"}
                 </button>
               </div>
             </Field>
 
+
             {/* Confirm */}
             <Field label={`${t.confirm}${t.requiredMark}`} error={errors.confirm}>
-              <div className="relative">
-                <input
-                  type={showConfirm ? "text" : "password"}
-                  className={inputCls(errors.confirm) + " pr-10"}
-                  value={form.confirm}
-                  onChange={(e) => onChange("confirm", e.target.value)}
-                  placeholder={t.placeholders.confirm}
-                  autoComplete="new-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirm(!showConfirm)}
-                  className="absolute right-3 top-3 text-[#1F3351]/70 text-xl font-bold"
-                  aria-label="Toggle password visibility"
-                >
-                  {showConfirm ? "◠" : "◉"}
-                </button>
-              </div>
+            <div className="relative flex items-center">
+              <input
+                type={showConfirm ? "text" : "password"}
+                className={inputCls(errors.confirm) + " pr-10"}
+                value={form.confirm}
+                onChange={(e) => onChange("confirm", e.target.value)}
+                placeholder={t.placeholders.confirm}
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirm(!showConfirm)}
+                className="absolute right-3 text-[#1F3351]/70 text-xl font-bold"
+              >
+                {showConfirm ? "◠" : "◉"}
+              </button>
+            </div>
+          </Field>
+
+
+            {/* Email */}
+            <Field label={`${t.email}${t.requiredMark}`} error={errors.email}>
+              <input
+                className={inputCls(errors.email)}
+                value={form.email}
+                onChange={(e) => onChange("email", e.target.value)}
+                placeholder={t.placeholders.email}
+                type="email"
+                autoComplete="email"
+              />
             </Field>
 
             {/* Major */}
@@ -607,7 +607,23 @@ export default function RegisterPage() {
             {/* Profile picture (optional) with preview */}
             <Field label={t.profilePic}>
               <div className="flex items-center gap-4">
-                <label className="inline-flex items-center px-4 py-2 rounded-xl border-2 border-[#1F3351]/40 bg-[#F5FAFF] hover:bg-[#EEF6FF] cursor-pointer">
+                <label
+                  className="
+                    mt-2
+                    inline-flex items-center
+                    px-5 py-2.5
+                    rounded-xl
+                    bg-white
+                    border border-[#1F3351]/40
+                    shadow-sm
+                    text-sm font-semibold text-[#1F3351]
+                    cursor-pointer
+                    hover:bg-[#EEF6FF]
+                    hover:shadow-md
+                    active:scale-[0.98]
+                    transition
+                  "
+                >
                   <input
                     type="file"
                     accept="image/*"
@@ -660,10 +676,11 @@ export default function RegisterPage() {
 
               <button
                 type="submit"
-                className="mt-4 w-fit rounded-xl px-6 py-3 font-semibold bg-[#E1860E] text-white hover:opacity-95 shadow-md focus:ring-4 focus:ring-[#E1860E]/30"
+                className="mt-4 mx-auto rounded-xl px-6 py-3 font-semibold bg-[#E1860E] text-white hover:opacity-95 shadow-md focus:ring-4 focus:ring-[#E1860E]/30"
               >
                 {t.register}
               </button>
+
             </div>
 
             {/* Footer link */}
@@ -692,14 +709,14 @@ function Field({ label, error, full = false, children }) {
 
 function inputCls(hasError) {
   return [
-    "w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition",
-    "bg-[#F5FAFF] shadow-inner", // lighter blue (idle)
+    "mt-2 w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4",
+    "bg-[#EDF5FA]", // same light blue as LoginPage
     hasError
       ? "border-red-500 focus:ring-red-200"
-      : "border-[#1F3351]/40 focus:border-[#E1860E] focus:ring-[#E1860E]/25 focus:bg-[#FFF8DC]",
-    "focus:ring-4",
+      : "border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30",
   ].join(" ");
 }
+
 
 function LogoShare({ className = "" }) {
   return (
@@ -713,3 +730,5 @@ function LogoShare({ className = "" }) {
     </svg>
   );
 }
+
+console.log('REACT_APP_API_URL:', process.env.REACT_APP_API_URL);

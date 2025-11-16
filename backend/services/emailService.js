@@ -1,14 +1,20 @@
-// services/emailService.js
-const nodemailer = require('nodemailer');
-const path = require('path');
-const fs = require('fs');
+// services/emailService.js - ES Module version
+import nodemailer from 'nodemailer';
+import path from 'path';
+import fs from 'fs';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables with absolute path
 const envPath = path.join(__dirname, '..', '.env');
 console.log('🔧 Loading .env from:', envPath);
 console.log('🔧 .env exists?', fs.existsSync(envPath));
 
-require('dotenv').config({ path: envPath });
+dotenv.config({ path: envPath });
 
 // Debug: Check ALL environment variables
 console.log('🔧 All environment variables:');
@@ -29,7 +35,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // Test the email connection
-async function testEmailConnection() {
+export async function testEmailConnection() {
   try {
     // Additional check for credentials
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
@@ -48,10 +54,8 @@ async function testEmailConnection() {
   }
 }
 
-// In services/emailService.js - REPLACE the sendWelcomeEmail function:
-
 // Send welcome email
-async function sendWelcomeEmail(user) {
+export async function sendWelcomeEmail(user) {
   const { email, username, neptun, major, startYear } = user;
 
   // Check if we have email credentials
@@ -142,7 +146,5 @@ This is an automated message, please do not reply.
   }
 }
 
-module.exports = {
-  testEmailConnection,
-  sendWelcomeEmail
-};
+// Alternative: You could also export as default
+// export default { testEmailConnection, sendWelcomeEmail };

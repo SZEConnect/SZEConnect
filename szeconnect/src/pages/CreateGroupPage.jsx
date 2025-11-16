@@ -4,8 +4,10 @@ import { useNavigate } from "react-router-dom";
 export default function CreateGroupPage() {
   const navigate = useNavigate();
   const fileRef = useRef(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
-  // ── i18n ────────────────────────────────
+
+  //  i18n 
   const [lang, setLang] = useState("hu");
   const t = useMemo(() => {
     const hu = {
@@ -41,7 +43,7 @@ export default function CreateGroupPage() {
     return lang === "hu" ? hu : en;
   }, [lang]);
 
-  // ── state ────────────────────────────────
+  //  state 
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
   const [errors, setErrors] = useState({});
@@ -85,48 +87,112 @@ export default function CreateGroupPage() {
     navigate("/groups/grp-new");
   };
 
-  // ── render ────────────────────────────────
+  //  render 
   return (
     <div className="min-h-screen bg-[#FDFDFE] flex flex-col">
-      {/* HEADER */}
-      <header className="flex items-center justify-between px-10 py-5 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <LogoShare className="w-10 h-10" />
-          <span className="text-2xl font-bold">{t.brand}</span>
-        </div>
+    {/* HEADER */}
+    <header className="flex items-center justify-between px-4 sm:px-6 md:px-10 py-4 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
+      {/* Logo + Brand (always visible) */}
+      <button
+        onClick={() => navigate("/home")}
+        className="flex items-center gap-2 sm:gap-3 focus:outline-none hover:opacity-90 transition"
+        title="Go to Home"
+      >
+        <LogoShare className="w-8 h-8 sm:w-10 sm:h-10" />
+        <span className="text-xl sm:text-2xl font-bold whitespace-nowrap">{t.brand}</span>
+      </button>
 
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
-            className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
-          >
-            {lang === "hu" ? "EN" : "HU"}
-          </button>
+      {/* Desktop buttons */}
+      <div className="hidden md:flex items-center gap-4">
+        <button
+          onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+          className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
+        >
+          {lang === "hu" ? "EN" : "HU"}
+        </button>
 
-          <button
-            onClick={() => navigate("/info")}
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
-            title={t.info}
-          >
-            i
-          </button>
+        <button
+          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
+          title={t.info}
+          onClick={() => navigate("/info")}
+        >
+          i
+        </button>
 
-          <button
-            onClick={() => navigate("/profile")}
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
-            title={t.profile}
-          >
-            👤
-          </button>
+        <button
+          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
+          title={t.profile}
+          onClick={() => navigate("/profile")}
+        >
+          👤
+        </button>
 
-          <button
-            onClick={() => navigate("/login")}
-            className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
-          >
-            {t.logout}
-          </button>
-        </div>
-      </header>
+        <button
+          className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
+          onClick={() => navigate("/login")}
+        >
+          {t.logout}
+        </button>
+      </div>
+
+      {/* Mobile Hamburger */}
+      <div className="md:hidden relative">
+        <button
+          onClick={() => setMenuOpen(!menuOpen)}
+          className="w-10 h-10 rounded-md bg-[#E1860E] text-white text-2xl font-bold flex items-center justify-center shadow hover:opacity-90"
+          aria-label="Toggle menu"
+        >
+          {menuOpen ? "×" : "☰"}
+        </button>
+
+        {/* Dropdown */}
+        {menuOpen && (
+          <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
+            <button
+              onClick={() => {
+                setLang(lang === "hu" ? "en" : "hu");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+            >
+              🌐 {lang === "hu" ? "EN" : "HU"}
+            </button>
+
+            <button
+              onClick={() => {
+                navigate("/info");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+            >
+              ℹ️ {t.info}
+            </button>
+
+            <button
+              onClick={() => {
+                navigate("/profile");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+            >
+              👤 {t.profile}
+            </button>
+
+            <button
+              onClick={() => {
+                navigate("/login");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold text-[#E1860E] hover:bg-[#EDF5FA]"
+            >
+              🚪 {t.logout}
+            </button>
+          </div>
+        )}
+      </div>
+    </header>
+
+
 
       {/* MAIN SECTION */}
       <main className="flex-1 px-10 py-12">
@@ -230,14 +296,14 @@ export default function CreateGroupPage() {
           </div>
 
           {/* BUTTONS */}
-          <div className="flex justify-between pt-4">
-            <button
+          <div className="flex justify-center pt-4">
+            {/* <button
               type="button"
               onClick={() => navigate(-1)}
               className="rounded-xl bg-[#6C8EBF] text-white font-semibold px-8 py-3 shadow hover:opacity-90"
             >
               {t.cancel}
-            </button>
+            </button> */}
 
             <button
               type="submit"

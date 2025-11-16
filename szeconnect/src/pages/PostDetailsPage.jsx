@@ -12,6 +12,10 @@ export default function PostDetailsPage() {
   const [comments, setComments] = useState([]);
   const [draft, setDraft] = useState("");
   const [replyDrafts, setReplyDrafts] = useState({});
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showCreateMenu, setShowCreateMenu] = useState(false);
+
+
 
   const t = useMemo(() => {
     const hu = {
@@ -25,6 +29,8 @@ export default function PostDetailsPage() {
       post: "Küldés",
       like: "Tetszik",
       dislike: "Nem tetszik",
+      createPost: "Új bejegyzés",
+      newGroup: "Új csoport",
     };
     const en = {
       brand: "SzeConnect",
@@ -37,6 +43,8 @@ export default function PostDetailsPage() {
       post: "Post",
       like: "Like",
       dislike: "Dislike",
+      createPost: "New Post",
+      newGroup: "New Group",
     };
     return lang === "hu" ? hu : en;
   }, [lang]);
@@ -113,119 +121,195 @@ export default function PostDetailsPage() {
   return (
     <div className="min-h-screen bg-[#FAFBFD] flex flex-col">
       {/* HEADER */}
-      <header className="flex items-center justify-between px-10 py-5 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <LogoShare className="w-10 h-10" />
-          <span className="text-2xl font-bold">{t.brand}</span>
-        </div>
+    <header className="flex items-center justify-between px-4 sm:px-6 md:px-10 py-4 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
+      {/* Logo + Brand (always visible) */}
+      <button
+        onClick={() => navigate("/home")}
+        className="flex items-center gap-2 sm:gap-3 focus:outline-none hover:opacity-90 transition"
+        title="Go to Home"
+      >
+        <LogoShare className="w-8 h-8 sm:w-10 sm:h-10" />
+        <span className="text-xl sm:text-2xl font-bold whitespace-nowrap">{t.brand}</span>
+      </button>
 
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
-            className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
-          >
-            {lang === "hu" ? "EN" : "HU"}
-          </button>
+      {/* Desktop buttons */}
+      <div className="hidden md:flex items-center gap-4">
+        <button
+          onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+          className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
+        >
+          {lang === "hu" ? "EN" : "HU"}
+        </button>
 
-          <button
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
-            title={t.info}
-            onClick={() => navigate("/info")}
-          >
-            i
-          </button>
+        <button
+          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
+          title={t.info}
+          onClick={() => navigate("/info")}
+        >
+          i
+        </button>
 
-          <button
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
-            title={t.profile}
-            onClick={() => navigate("/profile")}
-          >
-            👤
-          </button>
+        <button
+          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
+          title={t.profile}
+          onClick={() => navigate("/profile")}
+        >
+          👤
+        </button>
 
-          <button
-            className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
-            onClick={() => navigate("/login")}
-          >
-            {t.logout}
-          </button>
-        </div>
-      </header>
+        <button
+          className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
+          onClick={() => navigate("/login")}
+        >
+          {t.logout}
+        </button>
+      </div>
+
+      {/* Mobile Hamburger */}
+      <div className="md:hidden relative">
+        <button
+          onClick={() => setMenuOpen(!menuOpen)}
+          className="w-10 h-10 rounded-md bg-[#E1860E] text-white text-2xl font-bold flex items-center justify-center shadow hover:opacity-90"
+          aria-label="Toggle menu"
+        >
+          {menuOpen ? "×" : "☰"}
+        </button>
+
+        {/* Dropdown */}
+        {menuOpen && (
+          <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
+            <button
+              onClick={() => {
+                setLang(lang === "hu" ? "en" : "hu");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+            >
+              🌐 {lang === "hu" ? "EN" : "HU"}
+            </button>
+
+            <button
+              onClick={() => {
+                navigate("/info");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+            >
+              ℹ️ {t.info}
+            </button>
+
+            <button
+              onClick={() => {
+                navigate("/profile");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+            >
+              👤 {t.profile}
+            </button>
+
+            <button
+              onClick={() => {
+                navigate("/login");
+                setMenuOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 font-semibold text-[#E1860E] hover:bg-[#EDF5FA]"
+            >
+              🚪 {t.logout}
+            </button>
+          </div>
+        )}
+      </div>
+    </header>
+
 
       {/* MAIN CONTENT */}
       <main className="flex-1 px-10 py-10">
         <div className="max-w-5xl mx-auto space-y-8">
           {/* Post card */}
           <article className="rounded-2xl border border-[#C9D6E2] bg-[#F4F7FB] shadow-sm overflow-hidden p-6 space-y-4">
-            {/* Top row */}
-            <div className="flex items-start gap-4">
-              <Link
-                to={`/users/${post.authorId}`}
-                className="w-14 h-14 rounded-full bg-white border-2 border-[#1F3351]/40 flex items-center justify-center shrink-0"
-              >
-                <UserIcon className="w-8 h-8" />
-              </Link>
+            {/* Top row (responsive layout) */}
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              {/* Left side – avatar + author + title */}
+              <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 flex-1">
+                {/* Avatar */}
+                <Link
+                  to={`/users/${post.authorId}`}
+                  className="w-14 h-14 rounded-full bg-white border-2 border-[#1F3351]/40 flex items-center justify-center shrink-0 mx-auto sm:mx-0"
+                >
+                  <UserIcon className="w-8 h-8" />
+                </Link>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2 text-[#1F3351] font-semibold">
-                  <Link
-                    to={`/users/${post.authorId}`}
-                    className="hover:underline"
-                  >
-                    {post.author}
-                  </Link>
-                  <span className="text-[#1F3351]/60 text-sm">
-                    {post.createdAt}
-                  </span>
-                  <span className="ml-auto text-[#1F3351]/70 text-sm font-medium">
+                {/* Author + info */}
+                <div className="flex-1 min-w-0 text-center sm:text-left">
+                  <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 text-[#1F3351] font-semibold">
                     <Link
-                      to={`/groups/${post.groupId}`}
+                      to={`/users/${post.authorId}`}
                       className="hover:underline"
                     >
-                      {post.group}
+                      {post.author}
                     </Link>
-                  </span>
+                    <span className="text-[#1F3351]/60 text-sm">{post.createdAt}</span>
+                    <span className="text-[#1F3351]/70 text-sm font-medium sm:ml-auto">
+                      <Link
+                        to={`/groups/${post.groupId}`}
+                        className="hover:underline"
+                      >
+                        {post.group}
+                      </Link>
+                    </span>
+                  </div>
+
+                  <h1 className="mt-2 text-xl sm:text-2xl font-bold text-[#1F3351]">
+                    {post.title}
+                  </h1>
                 </div>
-                <h1 className="mt-2 text-2xl font-bold text-[#1F3351]">
-                  {post.title}
-                </h1>
               </div>
 
-              {/* Votes */}
-              <div className="flex flex-col items-center gap-2 ml-2">
+              {/* Like / Dislike row (like YouTube) */}
+              <div className="flex justify-center sm:justify-end items-center gap-3">
+                {/* LIKE button */}
                 <button
                   onClick={toggleUp}
-                  className={`p-2 rounded-full border-2 ${
-                    votes.my === 1
+                  className={`flex items-center gap-1 px-3 py-2 rounded-full border-2 transition
+                    ${votes.my === 1
                       ? "bg-[#1F3351] text-white border-[#1F3351]"
-                      : "bg-white text-[#1F3351] border-[#1F3351]/50 hover:bg-[#f7faff]"
-                  }`}
+                      : "bg-white text-[#1F3351] border-[#1F3351]/50 hover:bg-[#f7faff]"}`}
                   title={t.like}
                 >
                   <ThumbUp
                     className="w-5 h-5"
                     stroke={votes.my === 1 ? "#FFFFFF" : "#1F3351"}
                   />
+                  <span className="font-semibold text-sm">{votes.up}</span>
                 </button>
-                <span className="font-bold text-[#1F3351] text-sm">
-                  {votes.up - votes.down}
-                </span>
+
+                {/* DISLIKE button */}
                 <button
                   onClick={toggleDown}
-                  className={`p-2 rounded-full border-2 ${
-                    votes.my === -1
+                  className={`flex items-center gap-1 px-3 py-2 rounded-full border-2 transition
+                    ${votes.my === -1
                       ? "bg-[#1F3351] text-white border-[#1F3351]"
-                      : "bg-white text-[#1F3351] border-[#1F3351]/50 hover:bg-[#f7faff]"
-                  }`}
+                      : "bg-white text-[#1F3351] border-[#1F3351]/50 hover:bg-[#f7faff]"}`}
                   title={t.dislike}
                 >
                   <ThumbDown
                     className="w-5 h-5"
                     stroke={votes.my === -1 ? "#FFFFFF" : "#1F3351"}
                   />
+                  <span className="font-semibold text-sm">{votes.down}</span>
                 </button>
+                {/* REPORT POST BUTTON */}
+                  <button
+                    onClick={() => alert("Post reported (mock)")}
+                    className="rounded-lg bg-[#6C8EBF] text-white px-4 py-2 text-sm font-semibold shadow hover:opacity-90"
+                  >
+                    {lang === "hu" ? "Bejegyzés jelentése" : "Report Post"}
+                  </button>
+
               </div>
             </div>
+
 
             {/* Post content */}
             <div className="border border-[#C9D6E2] rounded-xl bg-white p-4 text-[#1F3351] leading-relaxed whitespace-pre-wrap">
@@ -273,7 +357,7 @@ export default function PostDetailsPage() {
                   onChange={(e) => setDraft(e.target.value)}
                   placeholder={t.placeholder}
                   rows={3}
-                  className="flex-1 rounded-xl border-2 border-[#6C8EBF]/40 bg-[#EDF5FA] px-3 py-2 outline-none focus:border-[#6C8EBF] focus:ring-4 focus:ring-[#6C8EBF]/30 transition resize-none"
+                  className="flex-1 rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] text-[#1F3351] resize-none placeholder:text-[#1F3351]/70 border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
                 />
 
                 <button
@@ -290,26 +374,37 @@ export default function PostDetailsPage() {
               {comments.map((c) => (
                 <li key={c.id}>
                   <article className="rounded-2xl bg-[#F4F7FB] border border-[#C9D6E2] p-4">
-                    <header className="flex items-center gap-3 mb-2">
-                      <Link
-                        to={`/users/${c.authorId}`}
-                        className="w-10 h-10 rounded-full bg-white border border-[#1F3351]/30 flex items-center justify-center"
-                      >
-                        <UserIcon className="w-6 h-6" />
-                      </Link>
-                      <div className="min-w-0">
-                        <div className="font-semibold text-[#1F3351]">
-                          <Link
-                            to={`/users/${c.authorId}`}
-                            className="hover:underline"
-                          >
-                            {c.author}
-                          </Link>
-                        </div>
-                        <div className="text-xs text-[#1F3351]/60">
-                          {c.createdAt}
+                    <header className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <Link
+                          to={`/users/${c.authorId}`}
+                          className="w-10 h-10 rounded-full bg-white border border-[#1F3351]/30 flex items-center justify-center"
+                        >
+                          <UserIcon className="w-6 h-6" />
+                        </Link>
+
+                        <div className="min-w-0">
+                          <div className="font-semibold text-[#1F3351]">
+                            <Link
+                              to={`/users/${c.authorId}`}
+                              className="hover:underline"
+                            >
+                              {c.author}
+                            </Link>
+                          </div>
+                          <div className="text-xs text-[#1F3351]/60">
+                            {c.createdAt}
+                          </div>
                         </div>
                       </div>
+
+                      {/* REPORT COMMENT BUTTON */}
+                      <button
+                        onClick={() => alert("Comment reported (mock)")}
+                        className="rounded-lg bg-[#6C8EBF] text-white px-4 py-2 text-sm font-semibold shadow hover:opacity-90"
+                      >
+                        {lang === "hu" ? "Jelentés" : "Report"}
+                      </button>
                     </header>
 
                     <p className="text-[#1F3351]/90 whitespace-pre-wrap">
@@ -353,7 +448,7 @@ export default function PostDetailsPage() {
                                 : "Write a reply..."
                             }
                             rows={2}
-                            className="flex-1 rounded-xl border-2 border-[#6C8EBF]/40 bg-[#EDF5FA] px-3 py-2 text-sm outline-none focus:border-[#6C8EBF] focus:ring-4 focus:ring-[#6C8EBF]/30 transition resize-none"
+                            className="flex-1 rounded-xl border-2 px-4 py-2 text-sm outline-none transition focus:ring-4 bg-[#EDF5FA] text-[#1F3351] resize-none placeholder:text-[#1F3351]/70 border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
                           />
                           <button
                             type="button"
@@ -372,19 +467,35 @@ export default function PostDetailsPage() {
                               key={r.id}
                               className="bg-white rounded-xl px-3 py-2"
                             >
-                              <div className="text-sm font-semibold text-[#1F3351]">
-                                {r.author}
+                              {/* Reply header with REPORT */}
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <div className="text-sm font-semibold text-[#1F3351]">
+                                    {r.author}
+                                  </div>
+                                  <div className="text-xs text-[#1F3351]/60">
+                                    {r.createdAt}
+                                  </div>
+                                </div>
+
+                                {/* REPORT REPLY BUTTON */}
+                                <button
+                                  onClick={() => alert("Reply reported (mock)")}
+                                  className="rounded-lg bg-[#6C8EBF] text-white px-4 py-2 text-sm font-semibold shadow hover:opacity-90"
+
+                                >
+                                  {lang === "hu" ? "Jelentés" : "Report"}
+                                </button>
                               </div>
-                              <div className="text-xs text-[#1F3351]/60">
-                                {r.createdAt}
-                              </div>
-                              <p className="text-sm text-[#1F3351]/80 mt-1">
+
+                              <p className="text-sm text-[#1F3351]/80 mt-2">
                                 {r.body}
                               </p>
                             </li>
                           ))}
                         </ul>
                       )}
+
                     </div>
                   </article>
                 </li>
@@ -392,6 +503,61 @@ export default function PostDetailsPage() {
             </ul>
           </section>
         </div>
+              {/* FLOATING CREATE BUTTON – orange, on right side but not at the very edge */}
+      <div className="fixed bottom-8 right-10 flex flex-col items-end space-y-3">
+        {showCreateMenu && (
+          <>
+            <button
+              onClick={() => navigate("/groups/new")}
+              className="w-44 flex items-center justify-between rounded-full bg-[#E1860E] text-white px-6 py-2 text-sm font-semibold shadow-lg hover:opacity-95 transition-transform"
+            >
+              <span>{t.newGroup}</span>
+            </button>
+
+            <button
+              onClick={() => navigate("/post/new")}
+              className="w-44 flex items-center justify-between rounded-full bg-[#E1860E] text-white px-6 py-2 text-sm font-semibold shadow-lg hover:opacity-95 transition-transform"
+            >
+              <span>{t.createPost}</span>
+            </button>
+          </>
+        )}
+
+        <button
+          onClick={() => setShowCreateMenu((prev) => !prev)}
+          className="w-14 h-14 rounded-full bg-[#E1860E] text-white shadow-lg hover:opacity-95 transition-transform flex items-center justify-center"
+          aria-label="Create"
+        >
+          {showCreateMenu ? (
+            // X icon
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              className="w-7 h-7"
+              stroke="white"
+              strokeWidth="3"
+              strokeLinecap="round"
+            >
+              <line x1="6" y1="6" x2="18" y2="18" />
+              <line x1="6" y1="18" x2="18" y2="6" />
+            </svg>
+          ) : (
+            // + icon
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              className="w-8 h-8"
+              stroke="white"
+              strokeWidth="3"
+              strokeLinecap="round"
+            >
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          )}
+        </button>
+
+      </div>
       </main>
     </div>
   );

@@ -7,6 +7,8 @@ export default function HomeFeedPage() {
   const [showGroups, setShowGroups] = useState(false);
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
+
 
   const t = useMemo(() => {
     const hu = {
@@ -87,69 +89,127 @@ export default function HomeFeedPage() {
   return (
     <div className="min-h-screen bg-[#FDFDFE] flex flex-col">
       {/* HEADER – same design as Interests page, with search bar added */}
-      <header className="flex items-center justify-between px-10 py-5 shadow-md bg-[#6C8EBF] text-white">
-        {/* Logo + name */}
-        <div className="flex items-center gap-3">
-          <LogoShare className="w-10 h-10" />
-          <span className="text-2xl font-bold">{t.brand}</span>
-        </div>
+        <header className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 md:px-10 py-4 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
+          {/* Top Row: Logo on the left, hamburger on the right */}
+          <div className="flex items-center justify-between w-full md:w-auto">
+            {/* Logo + Brand */}
+            <button
+              onClick={() => navigate("/home")}
+              className="flex items-center gap-2 sm:gap-3 focus:outline-none hover:opacity-90 transition"
+              title="Go to Home"
+            >
+              <LogoShare className="w-8 h-8 sm:w-10 sm:h-10" />
+              <span className="text-xl sm:text-2xl font-bold whitespace-nowrap">{t.brand}</span>
+            </button>
 
-        {/* Search bar (center) */}
-        <form
-          onSubmit={handleSearchSubmit}
-          className="flex-1 px-6 max-w-xl w-full hidden md:block"
-        >
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t.search}
-            className="w-full rounded-full border-2 border-[#1F3351] bg-[#EDF5FA] text-[#1F3351] px-4 py-2 text-sm outline-none transition focus:border-[#E1860E] focus:ring-4 focus:ring-[#E1860E]/30"
-          />
-        </form>
+            {/* Hamburger (mobile only, now on the far right) */}
+            <div className="md:hidden relative">
+              <button
+                onClick={() => setMenuOpen(!menuOpen)}
+                className="w-10 h-10 rounded-md bg-[#E1860E] text-white text-2xl font-bold flex items-center justify-center shadow hover:opacity-90"
+                aria-label="Toggle menu"
+              >
+                {menuOpen ? "×" : "☰"}
+              </button>
 
-        {/* Right side buttons – same design as Interests page */}
-        <div className="flex items-center gap-4">
-          {/* Language toggle */}
-          <button
-            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
-            className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
+              {menuOpen && (
+                <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
+                  <button
+                    onClick={() => {
+                      setLang(lang === 'hu' ? 'en' : 'hu');
+                      setMenuOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+                  >
+                    🌐 {lang === 'hu' ? 'EN' : 'HU'}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      navigate('/info');
+                      setMenuOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+                  >
+                    ℹ️ {t.info}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      navigate('/profile');
+                      setMenuOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+                  >
+                    👤 {t.profile}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      navigate('/login');
+                      setMenuOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2 font-semibold text-[#E1860E] hover:bg-[#EDF5FA]"
+                  >
+                    🚪 {t.logout}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Search bar (always visible, below on mobile) */}
+          <form
+            onSubmit={handleSearchSubmit}
+            className="order-3 md:order-none w-full md:w-auto flex-1 md:max-w-xl"
           >
-            {lang === "hu" ? "EN" : "HU"}
-          </button>
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t.search}
+              className="w-full rounded-full border-2 border-[#1F3351] bg-[#EDF5FA] text-[#1F3351] px-4 py-2 text-sm outline-none transition focus:border-[#E1860E] focus:ring-4 focus:ring-[#E1860E]/30"
+            />
+          </form>
 
-          {/* Info */}
-          <button
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
-            title={t.info}
-          >
-            i
-          </button>
+          {/* Right-side buttons (desktop only) */}
+          <div className="hidden md:flex items-center gap-4">
+            <button
+              onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+              className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
+            >
+              {lang === "hu" ? "EN" : "HU"}
+            </button>
+            <button
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
+              title={t.info}
+              onClick={() => navigate("/info")}
+            >
+              i
+            </button>
+            <button
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
+              title={t.profile}
+              onClick={() => navigate("/profile")}
+            >
+              👤
+            </button>
+            <button
+              className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
+              onClick={() => navigate("/login")}
+            >
+              {t.logout}
+            </button>
+          </div>
+        </header>
 
-          {/* Profile */}
-          <button
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
-            title={t.profile}
-            onClick={() => navigate("/users/:userid")}
-          >
-            👤
-          </button>
-
-          {/* Logout – always at far right */}
-          <button
-            className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
-            onClick={() => navigate("/login")}
-          >
-            {t.logout}
-          </button>
-        </div>
-      </header>
 
       {/* MAIN LAYOUT */}
       <div className="flex flex-1 overflow-hidden">
-        {/* GROUPS SIDEBAR – optional, full sidebar when open */}
+        {/* GROUPS SIDEBAR / DRAWER */}
+        {/* Desktop sidebar */}
         <aside
-          className={`bg-white border-r border-[#1F3351]/20 shadow-sm transition-all duration-300 ease-in-out ${
+          className={`hidden md:block bg-white border-r border-[#1F3351]/20 shadow-sm transition-all duration-300 ease-in-out ${
             showGroups ? "w-72" : "w-0"
           } overflow-hidden`}
         >
@@ -171,8 +231,55 @@ export default function HomeFeedPage() {
           </ul>
         </aside>
 
+        {/* Mobile overlay drawer (slides from the left) */}
+        {showGroups && (
+          <div className="md:hidden fixed inset-0 z-50 flex">
+            {/* Drawer */}
+            <div className="w-3/4 max-w-xs bg-white h-full shadow-lg animate-slideInLeft">
+              <div className="bg-[#E1860E] text-white font-bold px-5 py-3 flex justify-between items-center">
+                {t.groups}
+                <button
+                  onClick={() => setShowGroups(false)}
+                  className="text-white text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+              <ul className="divide-y divide-[#1F3351]/10 overflow-y-auto h-full">
+                {GROUPS.map((g) => (
+                  <li key={g.id}>
+                    <button
+                      onClick={() => {
+                        setShowGroups(false);
+                        navigate(`/groups/${g.id}`);
+                      }}
+                      className="w-full text-left px-5 py-3 hover:bg-[#EDF5FA] transition"
+                    >
+                      <span className="text-[#1F3351] font-semibold">{g.name}</span>{" "}
+                      <span className="text-[#1F3351]/60">({g.count})</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Backdrop */}
+            <div
+              className="flex-1 bg-black/40"
+              onClick={() => setShowGroups(false)}
+            ></div>
+          </div>
+        )}
+
+
         {/* FEED AREA */}
         <main className="flex-1 flex flex-col px-10 py-6 w-full">
+
+          {/* Page title (not in header) */}
+          <h1 className="text-3xl font-bold text-[#1F3351] mb-6">
+            {t.home}
+          </h1>
+
           {/* Top controls in content: groups toggle + page title */}
           <div className="flex items-center justify-between mb-4">
             <button
@@ -183,10 +290,6 @@ export default function HomeFeedPage() {
             </button>
           </div>
 
-          {/* Page title (not in header) */}
-          <h1 className="text-3xl font-bold text-[#1F3351] mb-6">
-            {t.home}
-          </h1>
 
           {/* POSTS – cards using remaining width with pastel color */}
           <section className="flex-1 space-y-6">
@@ -259,11 +362,38 @@ export default function HomeFeedPage() {
 
         <button
           onClick={() => setShowCreateMenu((prev) => !prev)}
-          className="w-14 h-14 rounded-full bg-[#E1860E] text-white text-3xl shadow-lg hover:opacity-95 transition-transform"
+          className="w-14 h-14 rounded-full bg-[#E1860E] text-white shadow-lg hover:opacity-95 transition-transform flex items-center justify-center"
           aria-label="Create"
         >
-          {showCreateMenu ? "×" : "+"}
+          {showCreateMenu ? (
+            // X icon
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              className="w-7 h-7"
+              stroke="white"
+              strokeWidth="3"
+              strokeLinecap="round"
+            >
+              <line x1="6" y1="6" x2="18" y2="18" />
+              <line x1="6" y1="18" x2="18" y2="6" />
+            </svg>
+          ) : (
+            // + icon
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              className="w-8 h-8"
+              stroke="white"
+              strokeWidth="3"
+              strokeLinecap="round"
+            >
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          )}
         </button>
+
       </div>
     </div>
   );
