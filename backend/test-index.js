@@ -1,5 +1,3 @@
-// server.js
-
 import dotenv from 'dotenv';
 import express from 'express';
 import bcrypt from 'bcrypt';
@@ -10,11 +8,11 @@ import { sendWelcomeEmail, testEmailConnection } from './services/emailService.j
 
 dotenv.config();
 
-console.log('🔧 Environment Check:');
-console.log('   DB_HOST:', process.env.DB_HOST);
-console.log('   DB_USER:', process.env.DB_USER);
-console.log('   DB_NAME:', process.env.DB_NAME);
-console.log('   DB_PORT:', process.env.DB_PORT);
+console.log('🔧 Environment Check for Render:');
+console.log('   INTERNAL_DATABASE_URL:', process.env.INTERNAL_DATABASE_URL ? 'SET' : 'NOT SET');
+console.log('   DATABASE_URL:', process.env.DATABASE_URL ? 'SET' : 'NOT SET');
+console.log('   JWT_SECRET:', process.env.JWT_SECRET ? 'SET' : 'NOT SET');
+console.log('   PORT:', process.env.PORT);
 
 const app = express();
 
@@ -29,7 +27,7 @@ app.options('*', cors());
 app.use(express.json());
 
 // Environment variables
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 const secret = process.env.JWT_SECRET;
 
 // --------------------
@@ -52,25 +50,28 @@ app.get("/", (req, res) => {
 });
 
 // --------------------
-// TEST ENV ROUTE - UPDATED FOR NEW DB VARS
+// TEST ENV ROUTE - UPDATED FOR INTERNAL URL
 // --------------------
 app.get("/test-env", (req, res) => {
   res.json({
     port: process.env.PORT,
     secretSet: !!process.env.JWT_SECRET,
     database: {
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      database: process.env.DB_NAME,
-      port: process.env.DB_PORT,
-      allSet: !!(process.env.DB_HOST && process.env.DB_USER && process.env.DB_NAME && process.env.DB_PORT)
+      internalUrlSet: !!process.env.INTERNAL_DATABASE_URL,
+      externalUrlSet: !!process.env.DATABASE_URL,
+      connectionType: process.env.INTERNAL_DATABASE_URL ? 'INTERNAL' : 'EXTERNAL',
+      allSet: !!(process.env.INTERNAL_DATABASE_URL || process.env.DATABASE_URL)
+    },
+    api: {
+      publicUrl: 'https://szeconnect.onrender.com',
+      frontendAccess: 'Ready for friend\'s computer'
     },
     message: "Environment variables loaded successfully!"
   });
 });
 
 // --------------------
-// TEST DATABASE CONNECTION
+// TEST DATABASE CONNECTION - UPDATED FOR INTERNAL URL
 // --------------------
 app.get("/test-db", async (req, res) => {
   try {
@@ -81,8 +82,12 @@ app.get("/test-db", async (req, res) => {
       time: result.rows[0].current_time,
       version: result.rows[0].postgres_version,
       connection: {
-        host: process.env.DB_HOST,
-        database: process.env.DB_NAME
+        type: process.env.INTERNAL_DATABASE_URL ? 'INTERNAL' : 'EXTERNAL',
+        ssl: process.env.INTERNAL_DATABASE_URL ? 'Disabled (Internal)' : 'Enabled (External)'
+      },
+      api: {
+        status: 'Ready for frontend connections',
+        url: 'https://szeconnect.onrender.com'
       }
     });
   } catch (err) {
@@ -91,14 +96,13 @@ app.get("/test-db", async (req, res) => {
       message: 'Database connection failed',
       error: err.message,
       connectionDetails: {
-        host: process.env.DB_HOST,
-        database: process.env.DB_NAME,
-        user: process.env.DB_USER
+        type: process.env.INTERNAL_DATABASE_URL ? 'INTERNAL' : 'EXTERNAL',
+        internalUrlSet: !!process.env.INTERNAL_DATABASE_URL,
+        externalUrlSet: !!process.env.DATABASE_URL
       }
     });
   }
 });
-
 // --------------------
 // ENHANCED REGISTER ROUTE WITH NEW FIELDS + EMAIL
 // --------------------
@@ -922,13 +926,12 @@ app.use((req, res) => {
 // --------------------
 app.listen(PORT, async () => {
   console.log('='.repeat(60));
-  console.log('🚀 SERVER STARTING...');
+  console.log('🚀 SERVER STARTING ON RENDER...');
   console.log('='.repeat(60));
   console.log(`📊 PORT: ${PORT}`);
   console.log(`🔐 JWT_SECRET: ${secret ? 'SET' : 'NOT SET!'}`);
-  console.log(`🏠 DB_HOST: ${process.env.DB_HOST}`);
-  console.log(`👤 DB_USER: ${process.env.DB_USER}`);
-  console.log(`🗃️ DB_NAME: ${process.env.DB_NAME}`);
+  console.log(`🗃️ INTERNAL_DATABASE_URL: ${process.env.INTERNAL_DATABASE_URL ? 'SET' : 'NOT SET!'}`);
+  console.log(`🌐 Public API URL: https://szeconnect.onrender.com`);
   
   // Test database connection
   console.log('🔄 Testing database connection...');
@@ -936,9 +939,13 @@ app.listen(PORT, async () => {
   
   console.log('='.repeat(60));
   if (dbConnected) {
-    console.log('✅ SERVER STARTED SUCCESSFULLY WITH DATABASE!');
+    console.log('✅ SERVER STARTED SUCCESSFULLY!');
+    console.log('   Backend → Database: INTERNAL URL ✓');
+    console.log('   Frontend → Backend: https://szeconnect.onrender.com ✓');
+    console.log('   Friend\'s computer can connect to API ✓');
   } else {
     console.log('⚠️  SERVER STARTED BUT DATABASE CONNECTION FAILED');
+    console.log('💡 Check INTERNAL_DATABASE_URL in Render environment');
   }
   console.log(`🌐 Server running on port ${PORT}`);
   console.log('='.repeat(60));
@@ -951,4 +958,49 @@ app.listen(PORT, async () => {
       console.log(`❌ Email service: NOT CONFIGURED`);
     }
   });
+});
+
+// --------------------
+// STATUS ENDPOINT (for frontend testing)
+// --------------------
+app.get("/status", async (req, res) => {
+  try {
+    // Test database connection
+    const dbResult = await pool.query('SELECT NOW() as db_time');
+    
+    res.json({
+      success: true,
+      message: "SzeConnect Backend is running!",
+      services: {
+        database: "Connected",
+        server: "Running", 
+        api: "Ready for frontend connections",
+        connection: process.env.INTERNAL_DATABASE_URL ? "Internal URL" : "External URL"
+      },
+      database: {
+        time: dbResult.rows[0].db_time,
+        connection: process.env.INTERNAL_DATABASE_URL ? "Internal" : "External",
+        ssl: process.env.INTERNAL_DATABASE_URL ? "Disabled" : "Enabled"
+      },
+      api: {
+        baseUrl: "https://szeconnect.onrender.com",
+        frontendInstructions: "Your friend can connect their frontend to this URL",
+        exampleEndpoints: [
+          "GET /status",
+          "POST /register", 
+          "POST /login",
+          "GET /groups",
+          "GET /users"
+        ]
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Backend running but database connection failed",
+      error: error.message,
+      connection: process.env.INTERNAL_DATABASE_URL ? "Internal URL" : "External URL"
+    });
+  }
 });
