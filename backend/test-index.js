@@ -13,101 +13,28 @@ dotenv.config();
 const app = express();
 
 // ✅ CRITICAL: Add CORS support BEFORE routes
-app.use(cors());
+app.use(cors({
+  origin: '*', // for testing: allow all origins
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+app.options('*', cors());
 app.use(express.json());
 
 // Environment variables
 const PORT = process.env.PORT || 3000;
 const secret = process.env.JWT_SECRET;
 
-// In-memory "database"
-let users = [];
-let userIdCounter = 1;
-
-// --------------------
-// GROUPS DATA STRUCTURES
-// --------------------
-let groups = [];
-let groupIdCounter = 1;
-let groupMemberships = [];
-let posts = [];
-let postIdCounter = 1;
-
-// Initialize with sample groups
-const sampleGroups = [
-  {
-    id: groupIdCounter++,
-    name: "Computer Science Majors",
-    description: "Discussion group for Computer Science students at SZE",
-    category: "academic",
-    major: "Computer Science",
-    tags: ["programming", "algorithms", "software engineering", "web development"],
-    memberCount: 0,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: groupIdCounter++,
-    name: "Mathematics Students",
-    description: "For students studying Mathematics and related fields",
-    category: "academic", 
-    major: "Mathematics",
-    tags: ["calculus", "statistics", "linear algebra", "discrete math"],
-    memberCount: 0,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: groupIdCounter++,
-    name: "Electrical Engineering",
-    description: "Community for Electrical Engineering students",
-    category: "academic",
-    major: "Electrical Engineering", 
-    tags: ["circuits", "electronics", "power systems", "signal processing"],
-    memberCount: 0,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: groupIdCounter++,
-    name: "First Year Students",
-    description: "Support and community for first year university students",
-    category: "general",
-    major: null,
-    tags: ["freshman", "orientation", "campus life", "study tips"],
-    memberCount: 0,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: groupIdCounter++,
-    name: "Programming Club",
-    description: "For students interested in programming and software development",
-    category: "hobby",
-    major: null,
-    tags: ["coding", "projects", "hackathons", "open source"],
-    memberCount: 0,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: groupIdCounter++,
-    name: "Research Opportunities",
-    description: "Share and discover research opportunities at the university",
-    category: "academic",
-    major: null,
-    tags: ["research", "professors", "publications", "grants"],
-    memberCount: 0,
-    createdAt: new Date().toISOString()
-  }
-];
-
-// Initialize groups array
-groups = [...sampleGroups];
-
 // --------------------
 // ROOT ROUTE
 // --------------------
 app.get("/", (req, res) => {
   res.json({ 
-    message: "Authentication Server is running!",
+    message: "Authentication Server is running with PostgreSQL!",
     endpoints: {
       test: "GET /test-env",
+      testDb: "GET /test-db",
       register: "POST /register",
       login: "POST /login", 
       profile: "GET /profile (requires auth)",
@@ -125,8 +52,30 @@ app.get("/test-env", (req, res) => {
   res.json({
     port: process.env.PORT,
     secretSet: !!process.env.JWT_SECRET,
+    databaseSet: !!process.env.DATABASE_URL,
     message: "Environment variables loaded successfully!"
   });
+});
+
+// --------------------
+// TEST DATABASE CONNECTION
+// --------------------
+app.get("/test-db", async (req, res) => {
+  try {
+    const result = await pool.query('SELECT NOW() as current_time, version() as postgres_version');
+    res.json({ 
+      success: true, 
+      message: 'PostgreSQL database connected!',
+      time: result.rows[0].current_time,
+      version: result.rows[0].postgres_version
+    });
+  } catch (err) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Database connection failed',
+      error: err.message 
+    });
+  }
 });
 
 // --------------------
@@ -212,15 +161,15 @@ app.post("/register", async (req, res) => {
     const normalizedFullName = fullName ? fullName.trim() : null;
     const normalizedBio = bio ? bio.trim() : null;
 
-    // === UNIQUENESS CHECKS (DATABASE) ===
+    // === UNIQUENESS CHECKS (POSTGRESQL) ===
     try {
-      const [existingUsers] = await pool.query(
-        `SELECT * FROM users WHERE email = ? OR username = ? OR neptun_code = ?`,
+      const existingUsers = await pool.query(
+        `SELECT * FROM users WHERE email = $1 OR username = $2 OR neptun_code = $3`,
         [normalizedEmail, normalizedUsername, normalizedNeptun]
       );
 
-      if (existingUsers.length > 0) {
-        const existing = existingUsers[0];
+      if (existingUsers.rows.length > 0) {
+        const existing = existingUsers.rows[0];
         if (existing.email === normalizedEmail) {
           return res.status(400).json({ 
             success: false,
@@ -233,7 +182,7 @@ app.post("/register", async (req, res) => {
             message: "Username already taken" 
           });
         }
-        if (existing.neptun === normalizedNeptun) {
+        if (existing.neptun_code === normalizedNeptun) {
           return res.status(400).json({ 
             success: false,
             message: "Neptun code already registered" 
@@ -252,28 +201,28 @@ app.post("/register", async (req, res) => {
     // === HASH PASSWORD ===
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // === SAVE USER TO DATABASE ===
+    // === SAVE USER TO DATABASE (POSTGRESQL) ===
     let result;
     try {
-  [result] = await pool.query(
-    `INSERT INTO users 
-     (username, neptun_code, fullname, birthdate, gender, email, start_year, major, bio, password_hash)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      normalizedUsername,      // username
-      normalizedNeptun,        // neptun_code  
-      normalizedFullName,      // fullname
-      birthYear ? `${birthYear}-01-01` : null,  // birthdate as YYYY-MM-DD
-      gender,                  // gender
-      normalizedEmail,         // email
-      parseInt(startYear),     // start_year
-      normalizedMajor,         // major
-      normalizedBio,           // bio
-      hashedPassword           // password_hash
-    ]
-  );
+      result = await pool.query(
+        `INSERT INTO users 
+         (username, neptun_code, fullname, birthdate, gender, email, start_year, major, bio, password_hash)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+        [
+          normalizedUsername,      // $1
+          normalizedNeptun,        // $2  
+          normalizedFullName,      // $3
+          birthYear ? `${birthYear}-01-01` : null,  // $4
+          gender,                  // $5
+          normalizedEmail,         // $6
+          parseInt(startYear),     // $7
+          normalizedMajor,         // $8
+          normalizedBio,           // $9
+          hashedPassword           // $10
+        ]
+      );
 
-      console.log("✅ Database insert successful! New ID:", result.insertId);
+      console.log("✅ Database insert successful! New user:", result.rows[0]);
     } catch (insertError) {
       console.error("❌ Database insert error:", insertError);
       console.error("❌ Insert query details:", {
@@ -293,17 +242,17 @@ app.post("/register", async (req, res) => {
 
     // === CREATE USER OBJECT FOR EMAIL ===
     const newUser = { 
-      id: result.insertId,
-      username: normalizedUsername,
-      email: normalizedEmail,
-      neptun: normalizedNeptun,
-      startYear: parseInt(startYear),
-      major: normalizedMajor,
-      fullName: normalizedFullName,
-      bio: normalizedBio,
-      gender: gender,
-      birthYear: birthYear ? parseInt(birthYear) : null,
-      createdAt: new Date().toISOString()
+      id: result.rows[0].user_id,
+      username: result.rows[0].username,
+      email: result.rows[0].email,
+      neptun: result.rows[0].neptun_code,
+      startYear: result.rows[0].start_year,
+      major: result.rows[0].major,
+      fullName: result.rows[0].fullname,
+      bio: result.rows[0].bio,
+      gender: result.rows[0].gender,
+      birthYear: result.rows[0].birthdate ? new Date(result.rows[0].birthdate).getFullYear() : null,
+      createdAt: result.rows[0].created_at || new Date().toISOString()
     };
 
     // ========================
@@ -354,7 +303,7 @@ app.post("/register", async (req, res) => {
 });
 
 // --------------------
-// LOGIN ROUTE
+// LOGIN ROUTE (POSTGRESQL)
 // --------------------
 app.post("/login", async (req, res) => {
   try {
@@ -364,21 +313,28 @@ app.post("/login", async (req, res) => {
       return res.status(400).json({ message: "Neptun and password are required" });
     }
 
-    const user = users.find(u => u.neptun === neptun.toUpperCase());
-    if (!user) {
+    // Query PostgreSQL database
+    const result = await pool.query(
+      'SELECT * FROM users WHERE neptun_code = $1',
+      [neptun.toUpperCase()]
+    );
+
+    if (result.rows.length === 0) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    const valid = await bcrypt.compare(password, user.password);
+    const user = result.rows[0];
+    const valid = await bcrypt.compare(password, user.password_hash);
+    
     if (!valid) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
     const token = jwt.sign(
       { 
-        id: user.id, 
+        id: user.user_id,
         username: user.username,
-        neptun: user.neptun 
+        neptun: user.neptun_code 
       },
       secret,
       { expiresIn: "1h" }
@@ -388,10 +344,12 @@ app.post("/login", async (req, res) => {
       message: "Login successful", 
       token,
       user: {
-        id: user.id,
+        id: user.user_id,
         username: user.username,
         email: user.email,
-        neptun: user.neptun
+        neptun: user.neptun_code,
+        major: user.major,
+        start_year: user.start_year
       }
     });
 
@@ -402,9 +360,9 @@ app.post("/login", async (req, res) => {
 });
 
 // --------------------
-// PROTECTED PROFILE ROUTE
+// PROTECTED PROFILE ROUTE (POSTGRESQL)
 // --------------------
-app.get("/profile", (req, res) => {
+app.get("/profile", async (req, res) => {
   try {
     const authHeader = req.headers["authorization"];
     if (!authHeader) {
@@ -419,27 +377,32 @@ app.get("/profile", (req, res) => {
 
     const decoded = jwt.verify(token, secret);
     
-    // Find user in database
-    const user = users.find(u => u.id === decoded.id);
-    if (!user) {
+    // Find user in PostgreSQL database
+    const result = await pool.query(
+      'SELECT * FROM users WHERE user_id = $1',
+      [decoded.id]
+    );
+
+    if (result.rows.length === 0) {
       return res.status(404).json({ message: "User not found" });
     }
+
+    const user = result.rows[0];
 
     res.json({ 
       message: `Hello ${decoded.username}, welcome to your profile!`,
       user: {
-        id: user.id,
+        id: user.user_id,
         username: user.username,
         email: user.email,
-        neptun: user.neptun,
-        startYear: user.startYear,
+        neptun: user.neptun_code,
+        startYear: user.start_year,
         major: user.major,
-        fullName: user.fullName,
+        fullName: user.fullname,
         bio: user.bio,
         gender: user.gender,
-        birthYear: user.birthYear,
-        createdAt: user.createdAt,
-        isActive: user.isActive
+        birthdate: user.birthdate,
+        createdAt: user.created_at
       }
     });
 
@@ -455,68 +418,70 @@ app.get("/profile", (req, res) => {
 });
 
 // --------------------
-// USERS LIST (for testing)
+// USERS LIST (POSTGRESQL)
 // --------------------
-app.get("/users", (req, res) => {
-  res.json({
-    totalUsers: users.length,
-    users: users.map(u => ({
-      id: u.id,
-      username: u.username,
-      email: u.email,
-      neptun: u.neptun,
-      createdAt: u.createdAt
-    }))
-  });
+app.get("/users", async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT user_id, username, email, neptun_code, major, start_year FROM users ORDER BY user_id'
+    );
+    
+    res.json({
+      totalUsers: result.rows.length,
+      users: result.rows.map(u => ({
+        id: u.user_id,
+        username: u.username,
+        email: u.email,
+        neptun: u.neptun_code,
+        major: u.major,
+        startYear: u.start_year
+      }))
+    });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ message: "Failed to fetch users" });
+  }
 });
 
 // --------------------
-// GROUP ENDPOINTS
+// GROUP ENDPOINTS (POSTGRESQL)
 // --------------------
 
-// Get all available groups
-app.get("/groups", (req, res) => {
+// Get all available groups from database
+app.get("/groups", async (req, res) => {
   try {
     const { category, major, search } = req.query;
     
-    let filteredGroups = groups;
+    let query = `
+      SELECT g.*, u.username as creator_name 
+      FROM groupok g 
+      LEFT JOIN users u ON g.creator_id = u.user_id
+    `;
+    let params = [];
+    let conditions = [];
 
-    // Filter by category if provided
-    if (category) {
-      filteredGroups = filteredGroups.filter(group => 
-        group.category.toLowerCase() === category.toLowerCase()
-      );
-    }
-
-    // Filter by major if provided  
-    if (major) {
-      filteredGroups = filteredGroups.filter(group => 
-        group.major && group.major.toLowerCase() === major.toLowerCase()
-      );
-    }
-
-    // Search in name, description, and tags
     if (search) {
-      const searchLower = search.toLowerCase();
-      filteredGroups = filteredGroups.filter(group =>
-        group.name.toLowerCase().includes(searchLower) ||
-        group.description.toLowerCase().includes(searchLower) ||
-        group.tags.some(tag => tag.toLowerCase().includes(searchLower))
-      );
+      conditions.push(`(g.group_name ILIKE $${params.length + 1} OR g.description ILIKE $${params.length + 1})`);
+      params.push(`%${search}%`);
     }
 
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+
+    query += ' ORDER BY g.group_name';
+
+    const result = await pool.query(query, params);
+    
     res.json({
       success: true,
-      total: filteredGroups.length,
-      groups: filteredGroups.map(g => ({
-        id: g.id,
-        name: g.name,
+      total: result.rows.length,
+      groups: result.rows.map(g => ({
+        id: g.group_id,
+        name: g.group_name,
         description: g.description,
-        category: g.category,
-        major: g.major,
-        tags: g.tags,
-        memberCount: g.memberCount,
-        createdAt: g.createdAt
+        creator: g.creator_name,
+        createdAt: g.created_at
       }))
     });
 
@@ -530,43 +495,46 @@ app.get("/groups", (req, res) => {
 });
 
 // Get a specific group by ID
-app.get("/groups/:groupId", (req, res) => {
+app.get("/groups/:groupId", async (req, res) => {
   try {
     const groupId = parseInt(req.params.groupId);
-    const group = groups.find(g => g.id === groupId);
+    
+    const groupResult = await pool.query(
+      `SELECT g.*, u.username as creator_name 
+       FROM groupok g 
+       LEFT JOIN users u ON g.creator_id = u.user_id 
+       WHERE g.group_id = $1`,
+      [groupId]
+    );
 
-    if (!group) {
+    if (groupResult.rows.length === 0) {
       return res.status(404).json({ 
         success: false, 
         message: "Group not found" 
       });
     }
 
+    const group = groupResult.rows[0];
+
     // Get members of this group
-    const memberIds = groupMemberships
-      .filter(gm => gm.groupId === groupId)
-      .map(gm => gm.userId);
-    
-    const members = users.filter(u => memberIds.includes(u.id))
-      .map(u => ({
-        id: u.id,
-        username: u.username,
-        major: u.major,
-        startYear: u.startYear
-      }));
+    const membersResult = await pool.query(
+      `SELECT u.user_id, u.username, u.major, u.start_year 
+       FROM followings f
+       JOIN users u ON f.user_id = u.user_id
+       WHERE f.group_id = $1`,
+      [groupId]
+    );
 
     res.json({
       success: true,
       group: {
-        id: group.id,
-        name: group.name,
+        id: group.group_id,
+        name: group.group_name,
         description: group.description,
-        category: group.category,
-        major: group.major,
-        tags: group.tags,
-        memberCount: group.memberCount,
-        createdAt: group.createdAt,
-        members: members
+        creator: group.creator_name,
+        memberCount: membersResult.rows.length,
+        createdAt: group.created_at,
+        members: membersResult.rows
       }
     });
 
@@ -580,7 +548,7 @@ app.get("/groups/:groupId", (req, res) => {
 });
 
 // Join a group
-app.post("/groups/:groupId/join", (req, res) => {
+app.post("/groups/:groupId/join", async (req, res) => {
   try {
     const authHeader = req.headers["authorization"];
     if (!authHeader) {
@@ -596,17 +564,28 @@ app.post("/groups/:groupId/join", (req, res) => {
     const userId = decoded.id;
     const groupId = parseInt(req.params.groupId);
     
-    const group = groups.find(g => g.id === groupId);
-    if (!group) {
+    // Check if group exists
+    const groupResult = await pool.query(
+      'SELECT * FROM groupok WHERE group_id = $1',
+      [groupId]
+    );
+    
+    if (groupResult.rows.length === 0) {
       return res.status(404).json({ 
         success: false, 
         message: "Group not found" 
       });
     }
     
+    const group = groupResult.rows[0];
+    
     // Check if user exists
-    const user = users.find(u => u.id === userId);
-    if (!user) {
+    const userResult = await pool.query(
+      'SELECT * FROM users WHERE user_id = $1',
+      [userId]
+    );
+    
+    if (userResult.rows.length === 0) {
       return res.status(404).json({ 
         success: false, 
         message: "User not found" 
@@ -614,11 +593,12 @@ app.post("/groups/:groupId/join", (req, res) => {
     }
     
     // Check if already joined
-    const existingMembership = groupMemberships.find(
-      gm => gm.userId === userId && gm.groupId === groupId
+    const existingMembership = await pool.query(
+      'SELECT * FROM followings WHERE user_id = $1 AND group_id = $2',
+      [userId, groupId]
     );
     
-    if (existingMembership) {
+    if (existingMembership.rows.length > 0) {
       return res.status(400).json({ 
         success: false, 
         message: "Already joined this group" 
@@ -626,25 +606,19 @@ app.post("/groups/:groupId/join", (req, res) => {
     }
     
     // Add membership
-    groupMemberships.push({
-      userId,
-      groupId,
-      joinedAt: new Date().toISOString(),
-      engagement: 0.5 // Default engagement score
-    });
-    
-    // Update member count
-    group.memberCount++;
+    await pool.query(
+      'INSERT INTO followings (user_id, group_id) VALUES ($1, $2)',
+      [userId, groupId]
+    );
 
-    console.log(`✅ User ${userId} joined group: ${group.name}`);
+    console.log(`✅ User ${userId} joined group: ${group.group_name}`);
 
     res.json({
       success: true,
-      message: `Successfully joined ${group.name}`,
+      message: `Successfully joined ${group.group_name}`,
       group: {
-        id: group.id,
-        name: group.name,
-        memberCount: group.memberCount
+        id: group.group_id,
+        name: group.group_name
       }
     });
     
@@ -658,7 +632,7 @@ app.post("/groups/:groupId/join", (req, res) => {
 });
 
 // Leave a group
-app.post("/groups/:groupId/leave", (req, res) => {
+app.post("/groups/:groupId/leave", async (req, res) => {
   try {
     const authHeader = req.headers["authorization"];
     if (!authHeader) {
@@ -674,41 +648,42 @@ app.post("/groups/:groupId/leave", (req, res) => {
     const userId = decoded.id;
     const groupId = parseInt(req.params.groupId);
     
-    const group = groups.find(g => g.id === groupId);
-    if (!group) {
+    // Check if group exists
+    const groupResult = await pool.query(
+      'SELECT * FROM groupok WHERE group_id = $1',
+      [groupId]
+    );
+    
+    if (groupResult.rows.length === 0) {
       return res.status(404).json({ 
         success: false, 
         message: "Group not found" 
       });
     }
     
-    // Find membership
-    const membershipIndex = groupMemberships.findIndex(
-      gm => gm.userId === userId && gm.groupId === groupId
+    const group = groupResult.rows[0];
+    
+    // Remove membership
+    const result = await pool.query(
+      'DELETE FROM followings WHERE user_id = $1 AND group_id = $2',
+      [userId, groupId]
     );
     
-    if (membershipIndex === -1) {
+    if (result.rowCount === 0) {
       return res.status(400).json({ 
         success: false, 
         message: "Not a member of this group" 
       });
     }
-    
-    // Remove membership
-    groupMemberships.splice(membershipIndex, 1);
-    
-    // Update member count
-    group.memberCount = Math.max(0, group.memberCount - 1);
 
-    console.log(`✅ User ${userId} left group: ${group.name}`);
+    console.log(`✅ User ${userId} left group: ${group.group_name}`);
 
     res.json({
       success: true,
-      message: `Successfully left ${group.name}`,
+      message: `Successfully left ${group.group_name}`,
       group: {
-        id: group.id,
-        name: group.name,
-        memberCount: group.memberCount
+        id: group.group_id,
+        name: group.group_name
       }
     });
     
@@ -722,7 +697,7 @@ app.post("/groups/:groupId/leave", (req, res) => {
 });
 
 // Get user's joined groups
-app.get("/user/groups", (req, res) => {
+app.get("/user/groups", async (req, res) => {
   try {
     const authHeader = req.headers["authorization"];
     if (!authHeader) {
@@ -737,23 +712,24 @@ app.get("/user/groups", (req, res) => {
     
     const userId = decoded.id;
     
-    const userMemberships = groupMemberships.filter(gm => gm.userId === userId);
-    const userGroups = groups.filter(g => 
-      userMemberships.some(gm => gm.groupId === g.id)
+    const result = await pool.query(
+      `SELECT g.*, u.username as creator_name 
+       FROM followings f
+       JOIN groupok g ON f.group_id = g.group_id
+       LEFT JOIN users u ON g.creator_id = u.user_id
+       WHERE f.user_id = $1`,
+      [userId]
     );
     
     res.json({
       success: true,
-      total: userGroups.length,
-      groups: userGroups.map(g => ({
-        id: g.id,
-        name: g.name,
+      total: result.rows.length,
+      groups: result.rows.map(g => ({
+        id: g.group_id,
+        name: g.group_name,
         description: g.description,
-        category: g.category,
-        major: g.major,
-        tags: g.tags,
-        memberCount: g.memberCount,
-        joinedAt: userMemberships.find(gm => gm.groupId === g.id).joinedAt
+        creator: g.creator_name,
+        memberCount: g.member_count || 0
       }))
     });
     
@@ -771,29 +747,25 @@ app.get("/user/groups", (req, res) => {
 // --------------------
 
 // Get server statistics
-app.get('/dev/stats', (req, res) => {
-  res.json({
-    totalUsers: users.length,
-    totalGroups: groups.length,
-    totalMemberships: groupMemberships.length,
-    lastUser: users[users.length - 1] || null,
-    serverUptime: Math.floor(process.uptime()) + ' seconds',
-    memoryUsage: process.memoryUsage(),
-    timestamp: new Date().toISOString()
-  });
-});
+app.get('/dev/stats', async (req, res) => {
+  try {
+    const usersCount = await pool.query('SELECT COUNT(*) FROM users');
+    const groupsCount = await pool.query('SELECT COUNT(*) FROM groupok');
+    const membershipsCount = await pool.query('SELECT COUNT(*) FROM followings');
+    const lastUser = await pool.query('SELECT * FROM users ORDER BY user_id DESC LIMIT 1');
 
-// Clear all users (for testing)
-app.delete('/dev/clear-users', (req, res) => {
-  const previousCount = users.length;
-  users = [];
-  userIdCounter = 1;
-  
-  res.json({
-    message: `Cleared ${previousCount} users`,
-    usersCount: users.length,
-    timestamp: new Date().toISOString()
-  });
+    res.json({
+      totalUsers: parseInt(usersCount.rows[0].count),
+      totalGroups: parseInt(groupsCount.rows[0].count),
+      totalMemberships: parseInt(membershipsCount.rows[0].count),
+      lastUser: lastUser.rows[0] || null,
+      serverUptime: Math.floor(process.uptime()) + ' seconds',
+      memoryUsage: process.memoryUsage(),
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Create test user quickly
@@ -804,33 +776,45 @@ app.post('/dev/test-user', async (req, res) => {
       username: 'testuser_' + testId,
       email: `test${testId}@example.com`,
       neptun: 'TST' + testId,
-      password: 'testpass123'
+      password: 'testpass123',
+      startYear: 2024,
+      major: 'Computer Science'
     };
 
     const hashedPassword = await bcrypt.hash(testUser.password, 10);
-    const newUser = {
-      id: userIdCounter++,
-      ...testUser,
-      password: hashedPassword,
-      createdAt: new Date().toISOString()
-    };
     
-    users.push(newUser);
+    const result = await pool.query(
+      `INSERT INTO users 
+       (username, neptun_code, email, start_year, major, password_hash)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [
+        testUser.username,
+        testUser.neptun,
+        testUser.email,
+        testUser.startYear,
+        testUser.major,
+        hashedPassword
+      ]
+    );
+
+    const newUser = result.rows[0];
     
     res.json({
       success: true,
       message: 'Test user created successfully',
       user: {
-        id: newUser.id,
+        id: newUser.user_id,
         username: newUser.username,
         email: newUser.email,
-        neptun: newUser.neptun
+        neptun: newUser.neptun_code
       }
     });
   } catch (error) {
+    console.error("Error creating test user:", error);
     res.status(500).json({ 
       success: false,
-      message: 'Failed to create test user' 
+      message: 'Failed to create test user',
+      error: error.message
     });
   }
 });
@@ -895,6 +879,7 @@ app.use((req, res) => {
     availableEndpoints: {
       root: "GET /",
       test: "GET /test-env",
+      testDb: "GET /test-db",
       register: "POST /register",
       login: "POST /login",
       profile: "GET /profile",
@@ -905,7 +890,6 @@ app.use((req, res) => {
       leaveGroup: "POST /groups/:id/leave",
       userGroups: "GET /user/groups",
       devStats: "GET /dev/stats",
-      devClearUsers: "DELETE /dev/clear-users",
       devTestUser: "POST /dev/test-user",
       testEmail: "GET /test-email"
     }
@@ -917,6 +901,7 @@ app.use((req, res) => {
 // --------------------
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`✅ PostgreSQL database connected to Render!`);
   console.log(`✅ CORS enabled - Frontend can connect!`);
   console.log(`📊 Environment: PORT=${PORT}, JWT_SECRET=${secret ? "Set" : "Not set!"}`);
   
@@ -928,8 +913,6 @@ app.listen(PORT, () => {
       console.log(`❌ Email service: NOT CONFIGURED - Check your .env file`);
     }
   });
-  
-  console.log(`👥 Groups system: READY (${groups.length} groups available)`);
   
   if (!secret) {
     console.log("❌ WARNING: JWT_SECRET is not set in .env file!");
