@@ -5,10 +5,16 @@ import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
-import pool from './database.js';
+import pool, { testConnection } from './database.js';
 import { sendWelcomeEmail, testEmailConnection } from './services/emailService.js';
 
 dotenv.config();
+
+console.log('🔧 Environment Check:');
+console.log('   DB_HOST:', process.env.DB_HOST);
+console.log('   DB_USER:', process.env.DB_USER);
+console.log('   DB_NAME:', process.env.DB_NAME);
+console.log('   DB_PORT:', process.env.DB_PORT);
 
 const app = express();
 
@@ -46,13 +52,19 @@ app.get("/", (req, res) => {
 });
 
 // --------------------
-// TEST ENV ROUTE
+// TEST ENV ROUTE - UPDATED FOR NEW DB VARS
 // --------------------
 app.get("/test-env", (req, res) => {
   res.json({
     port: process.env.PORT,
     secretSet: !!process.env.JWT_SECRET,
-    databaseSet: !!process.env.DATABASE_URL,
+    database: {
+      host: process.env.DB_HOST,
+      user: process.env.DB_USER,
+      database: process.env.DB_NAME,
+      port: process.env.DB_PORT,
+      allSet: !!(process.env.DB_HOST && process.env.DB_USER && process.env.DB_NAME && process.env.DB_PORT)
+    },
     message: "Environment variables loaded successfully!"
   });
 });
@@ -67,13 +79,22 @@ app.get("/test-db", async (req, res) => {
       success: true, 
       message: 'PostgreSQL database connected!',
       time: result.rows[0].current_time,
-      version: result.rows[0].postgres_version
+      version: result.rows[0].postgres_version,
+      connection: {
+        host: process.env.DB_HOST,
+        database: process.env.DB_NAME
+      }
     });
   } catch (err) {
     res.status(500).json({ 
       success: false, 
       message: 'Database connection failed',
-      error: err.message 
+      error: err.message,
+      connectionDetails: {
+        host: process.env.DB_HOST,
+        database: process.env.DB_NAME,
+        user: process.env.DB_USER
+      }
     });
   }
 });
@@ -899,22 +920,35 @@ app.use((req, res) => {
 // --------------------
 // START SERVER
 // --------------------
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`✅ PostgreSQL database connected to Render!`);
-  console.log(`✅ CORS enabled - Frontend can connect!`);
-  console.log(`📊 Environment: PORT=${PORT}, JWT_SECRET=${secret ? "Set" : "Not set!"}`);
+app.listen(PORT, async () => {
+  console.log('='.repeat(60));
+  console.log('🚀 SERVER STARTING...');
+  console.log('='.repeat(60));
+  console.log(`📊 PORT: ${PORT}`);
+  console.log(`🔐 JWT_SECRET: ${secret ? 'SET' : 'NOT SET!'}`);
+  console.log(`🏠 DB_HOST: ${process.env.DB_HOST}`);
+  console.log(`👤 DB_USER: ${process.env.DB_USER}`);
+  console.log(`🗃️ DB_NAME: ${process.env.DB_NAME}`);
   
-  // Test email connection on startup
+  // Test database connection
+  console.log('🔄 Testing database connection...');
+  const dbConnected = await testConnection();
+  
+  console.log('='.repeat(60));
+  if (dbConnected) {
+    console.log('✅ SERVER STARTED SUCCESSFULLY WITH DATABASE!');
+  } else {
+    console.log('⚠️  SERVER STARTED BUT DATABASE CONNECTION FAILED');
+  }
+  console.log(`🌐 Server running on port ${PORT}`);
+  console.log('='.repeat(60));
+  
+  // Test email connection
   testEmailConnection().then(connected => {
     if (connected) {
       console.log(`📧 Email service: READY`);
     } else {
-      console.log(`❌ Email service: NOT CONFIGURED - Check your .env file`);
+      console.log(`❌ Email service: NOT CONFIGURED`);
     }
   });
-  
-  if (!secret) {
-    console.log("❌ WARNING: JWT_SECRET is not set in .env file!");
-  }
 });
