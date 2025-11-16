@@ -1,51 +1,55 @@
-// database.js - PostgreSQL version for Render
+// database.js - FIXED for SSL
 import pkg from 'pg';
 const { Pool } = pkg;
 
+console.log('🔧 Database Configuration:');
+console.log('   DB_HOST:', process.env.DB_HOST);
+console.log('   DB_USER:', process.env.DB_USER);
+console.log('   DB_NAME:', process.env.DB_NAME);
+console.log('   DB_PORT:', process.env.DB_PORT);
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  host: process.env.DB_HOST,
+  port: Number(process.env.DB_PORT),
+  user: process.env.DB_USER,
+  password: process.env.DB_PASS,
+  database: process.env.DB_NAME,
   ssl: {
-    rejectUnauthorized: false  // Required for Render PostgreSQL
+    rejectUnauthorized: false, // This is required for Render
+    require: true // Add this line to force SSL
   },
-  // Optional: Connection pool settings
-  max: 20, // maximum number of clients in the pool
-  idleTimeoutMillis: 30000, // how long a client is allowed to remain idle before being closed
-  connectionTimeoutMillis: 2000, // how long to wait for a connection
-  maxUses: 7500, // close a client after it has been used this many times
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
 });
 
-// Test connection
-async function testConnection() {
+export const testConnection = async () => {
+  let client;
   try {
-    const client = await pool.connect();
-    console.log('✅ PostgreSQL database connected successfully to Render');
-    
-    // Test query to verify everything works
+    console.log('🔄 Attempting SSL connection to:', process.env.DB_HOST);
+    client = await pool.connect();
     const result = await client.query('SELECT NOW() as current_time');
-    console.log('📊 Database time:', result.rows[0].current_time);
-    
-    client.release();
+    console.log('✅ SSL Database connection successful!');
+    console.log('📊 Server time:', result.rows[0].current_time);
+    return true;
   } catch (error) {
-    console.error('❌ PostgreSQL database connection failed:', error.message);
-    console.error('💡 Make sure your DATABASE_URL environment variable is set correctly');
+    console.error('❌ Database connection failed:');
+    console.error('   Error:', error.message);
+    console.error('   Code:', error.code);
+    
+    // More detailed SSL error info
+    if (error.message.includes('SSL')) {
+      console.error('💡 SSL Issue Detected:');
+      console.error('   - Render PostgreSQL requires SSL');
+      console.error('   - Make sure ssl: { require: true } is set');
+    }
+    return false;
+  } finally {
+    if (client) client.release();
   }
-}
+};
 
-// Event listeners for connection monitoring
-pool.on('connect', () => {
-  console.log('🔗 New client connected to PostgreSQL pool');
-});
+pool.on('connect', () => console.log('🔗 New SSL client connected'));
+pool.on('error', (err) => console.error('❌ Pool error:', err.message));
 
-pool.on('error', (err) => {
-  console.error('❌ PostgreSQL pool error:', err);
-});
-
-pool.on('remove', () => {
-  console.log('🔌 Client removed from PostgreSQL pool');
-});
-
-// Test connection on startup
-testConnection();
-
-// Export the pool
 export default pool;
