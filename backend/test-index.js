@@ -9,7 +9,7 @@ import { sendWelcomeEmail, testEmailConnection } from './services/emailService.j
 dotenv.config();
 
 console.log('🔧 Environment Check for Render:');
-console.log('   INTERNAL_DATABASE_URL:', process.env.INTERNAL_DATABASE_URL ? 'SET' : 'NOT SET');
+console.log('   IDATABASE_URL:', process.env.DATABASE_URL ? 'SET' : 'NOT SET');
 console.log('   DATABASE_URL:', process.env.DATABASE_URL ? 'SET' : 'NOT SET');
 console.log('   JWT_SECRET:', process.env.JWT_SECRET ? 'SET' : 'NOT SET');
 console.log('   PORT:', process.env.PORT);
@@ -57,10 +57,10 @@ app.get("/test-env", (req, res) => {
     port: process.env.PORT,
     secretSet: !!process.env.JWT_SECRET,
     database: {
-      internalUrlSet: !!process.env.INTERNAL_DATABASE_URL,
+      internalUrlSet: !!process.env.DATABASE_URL,
       externalUrlSet: !!process.env.DATABASE_URL,
-      connectionType: process.env.INTERNAL_DATABASE_URL ? 'INTERNAL' : 'EXTERNAL',
-      allSet: !!(process.env.INTERNAL_DATABASE_URL || process.env.DATABASE_URL)
+      connectionType: process.env.DATABASE_URL ? 'INTERNAL' : 'EXTERNAL',
+      allSet: !!(process.env.DATABASE_URL || process.env.DATABASE_URL)
     },
     api: {
       publicUrl: 'https://szeconnect.onrender.com',
@@ -82,8 +82,8 @@ app.get("/test-db", async (req, res) => {
       time: result.rows[0].current_time,
       version: result.rows[0].postgres_version,
       connection: {
-        type: process.env.INTERNAL_DATABASE_URL ? 'INTERNAL' : 'EXTERNAL',
-        ssl: process.env.INTERNAL_DATABASE_URL ? 'Disabled (Internal)' : 'Enabled (External)'
+        type: process.env.DATABASE_URL ? 'INTERNAL' : 'EXTERNAL',
+        ssl: process.env.DATABASE_URL ? 'Disabled (Internal)' : 'Enabled (External)'
       },
       api: {
         status: 'Ready for frontend connections',
@@ -96,8 +96,8 @@ app.get("/test-db", async (req, res) => {
       message: 'Database connection failed',
       error: err.message,
       connectionDetails: {
-        type: process.env.INTERNAL_DATABASE_URL ? 'INTERNAL' : 'EXTERNAL',
-        internalUrlSet: !!process.env.INTERNAL_DATABASE_URL,
+        type: process.env.DATABASE_URL ? 'INTERNAL' : 'EXTERNAL',
+        internalUrlSet: !!process.env.DATABASE_URL,
         externalUrlSet: !!process.env.DATABASE_URL
       }
     });
@@ -930,7 +930,7 @@ app.listen(PORT, async () => {
   console.log('='.repeat(60));
   console.log(`📊 PORT: ${PORT}`);
   console.log(`🔐 JWT_SECRET: ${secret ? 'SET' : 'NOT SET!'}`);
-  console.log(`🗃️ INTERNAL_DATABASE_URL: ${process.env.INTERNAL_DATABASE_URL ? 'SET' : 'NOT SET!'}`);
+  console.log(`🗃️ DATABASE_URL: ${process.env.DATABASE_URL ? 'SET' : 'NOT SET!'}`);
   console.log(`🌐 Public API URL: https://szeconnect.onrender.com`);
   
   // Test database connection
@@ -945,7 +945,7 @@ app.listen(PORT, async () => {
     console.log('   Friend\'s computer can connect to API ✓');
   } else {
     console.log('⚠️  SERVER STARTED BUT DATABASE CONNECTION FAILED');
-    console.log('💡 Check INTERNAL_DATABASE_URL in Render environment');
+    console.log('💡 Check DATABASE_URL in Render environment');
   }
   console.log(`🌐 Server running on port ${PORT}`);
   console.log('='.repeat(60));
@@ -975,12 +975,12 @@ app.get("/status", async (req, res) => {
         database: "Connected",
         server: "Running", 
         api: "Ready for frontend connections",
-        connection: process.env.INTERNAL_DATABASE_URL ? "Internal URL" : "External URL"
+        connection: process.env.DATABASE_URL ? "Internal URL" : "External URL"
       },
       database: {
         time: dbResult.rows[0].db_time,
-        connection: process.env.INTERNAL_DATABASE_URL ? "Internal" : "External",
-        ssl: process.env.INTERNAL_DATABASE_URL ? "Disabled" : "Enabled"
+        connection: process.env.DATABASE_URL ? "Internal" : "External",
+        ssl: process.env.DATABASE_URL ? "Disabled" : "Enabled"
       },
       api: {
         baseUrl: "https://szeconnect.onrender.com",
@@ -1000,7 +1000,7 @@ app.get("/status", async (req, res) => {
       success: false,
       message: "Backend running but database connection failed",
       error: error.message,
-      connection: process.env.INTERNAL_DATABASE_URL ? "Internal URL" : "External URL"
+      connection: process.env.DATABASE_URL ? "Internal URL" : "External URL"
     });
   }
 });
