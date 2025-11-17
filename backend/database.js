@@ -2,21 +2,34 @@
 import pg from 'pg';
 const { Pool } = pg;
 
-// Render provides an INTERNAL_DATABASE_URL for services on the same network.
-// Locally, you use DATABASE_URL from your .env file.
-const connectionString =
-  process.env.INTERNAL_DATABASE_URL || process.env.DATABASE_URL;
+// Always use Render's internal URL
+const connectionString = process.env.INTERNAL_DATABASE_URL;
 
 if (!connectionString) {
-  throw new Error("No DATABASE_URL or INTERNAL_DATABASE_URL found in env variables.");
+  throw new Error("No INTERNAL_DATABASE_URL found in environment variables.");
 }
 
-// Render requires SSL, local Postgres does not.
+// Render internal Postgres requires SSL, but we disable certificate verification
 const pool = new Pool({
   connectionString,
-  ssl: process.env.RENDER 
-    ? { rejectUnauthorized: false } 
-    : false
+  ssl: { rejectUnauthorized: false },
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 15000
 });
+
+// Optional: test connection helper
+export const testConnection = async () => {
+  try {
+    const client = await pool.connect();
+    const result = await client.query('SELECT NOW() as now');
+    console.log('✅ Database connected! Current time:', result.rows[0].now);
+    client.release();
+    return true;
+  } catch (err) {
+    console.error('❌ Database connection failed:', err.message);
+    return false;
+  }
+};
 
 export default pool;
