@@ -817,6 +817,185 @@ app.get("/posts", async (req, res) => {
   }
 });
 // --------------------
+// COMMENTS ENDPOINTS (UPDATED FOR NESTED COMMENTS)
+// --------------------
+
+// Get comments for a post (with nested replies)
+app.get("/posts/:postId/comments", async (req, res) => {
+  try {
+    const postId = parseInt(req.params.postId);
+    
+    // Get top-level comments (no parent)
+    const result = await pool.query(`
+      SELECT 
+        c.comment_id,
+        c.comment,
+        c.comment_date,
+        c.user_id,
+        u.username,
+        u.major
+      FROM comments c
+      LEFT JOIN users u ON c.user_id = u.user_id
+      WHERE c.post_id = $1 AND c.parent_comment_id IS NULL AND c.comment_deleted IS NULL
+      ORDER BY c.comment_date ASC
+    `, [postId]);
+
+    // Get replies for each comment
+    const commentsWithReplies = await Promise.all(
+      result.rows.map(async (comment) => {
+        const repliesResult = await pool.query(`
+          SELECT 
+            c.comment_id,
+            c.comment,
+            c.comment_date,
+            c.user_id,
+            u.username,
+            u.major
+          FROM comments c
+          LEFT JOIN users u ON c.user_id = u.user_id
+          WHERE c.parent_comment_id = $1 AND c.comment_deleted IS NULL
+          ORDER BY c.comment_date ASC
+        `, [comment.comment_id]);
+
+        return {
+          id: comment.comment_id,
+          text: comment.comment,
+          time: comment.comment_date,
+          userId: comment.user_id,
+          userName: comment.username,
+          userMajor: comment.major,
+          replies: repliesResult.rows.map(reply => ({
+            id: reply.comment_id,
+            text: reply.comment,
+            time: reply.comment_date,
+            userId: reply.user_id,
+            userName: reply.username,
+            userMajor: reply.major
+          }))
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      total: commentsWithReplies.length,
+      comments: commentsWithReplies
+    });
+
+  } catch (error) {
+    console.error("❌ Error fetching comments:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to fetch comments" 
+    });
+  }
+});
+
+// Add a new comment to a post (top-level or reply)
+app.post("/posts/:postId/comments", async (req, res) => {
+  try {
+    const authHeader = req.headers["authorization"];
+    if (!authHeader) {
+      return res.status(401).json({ 
+        success: false, 
+        message: "Authorization token required" 
+      });
+    }
+
+    const token = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : authHeader;
+    const decoded = jwt.verify(token, secret);
+    
+    const userId = decoded.id;
+    const postId = parseInt(req.params.postId);
+    const { comment, parentCommentId } = req.body;
+
+    if (!comment || comment.trim() === '') {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Comment text is required" 
+      });
+    }
+
+    // Check if post exists
+    const postResult = await pool.query(
+      'SELECT * FROM posts WHERE post_id = $1',
+      [postId]
+    );
+    
+    if (postResult.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Post not found" 
+      });
+    }
+
+    // If it's a reply, check if parent comment exists
+    if (parentCommentId) {
+      const parentResult = await pool.query(
+        'SELECT * FROM comments WHERE comment_id = $1 AND post_id = $2',
+        [parentCommentId, postId]
+      );
+      
+      if (parentResult.rows.length === 0) {
+        return res.status(404).json({ 
+          success: false, 
+          message: "Parent comment not found" 
+        });
+      }
+    }
+
+    // Insert the comment
+    const result = await pool.query(
+      `INSERT INTO comments 
+       (post_id, user_id, parent_comment_id, comment, comment_date, comment_update, comment_edited, comment_deleted)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+       RETURNING *`,
+      [
+        postId,
+        userId,
+        parentCommentId || null, // null for top-level comments
+        comment.trim(),
+        new Date(), // comment_date
+        new Date(), // comment_update
+        'N',        // comment_edited
+        null        // comment_deleted
+      ]
+    );
+
+    // Get user info for the response
+    const userResult = await pool.query(
+      'SELECT username, major FROM users WHERE user_id = $1',
+      [userId]
+    );
+
+    const newComment = result.rows[0];
+    const user = userResult.rows[0];
+
+    console.log(`✅ User ${userId} commented on post ${postId}`);
+
+    res.status(201).json({
+      success: true,
+      message: "Comment added successfully",
+      comment: {
+        id: newComment.comment_id,
+        text: newComment.comment,
+        time: newComment.comment_date,
+        userId: userId,
+        userName: user.username,
+        userMajor: user.major,
+        replies: [] // New comments start with empty replies array
+      }
+    });
+    
+  } catch (error) {
+    console.error("❌ Error adding comment:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to add comment" 
+    });
+  }
+});
+// --------------------
 // DEV UTILITY ENDPOINTS
 // --------------------
 
