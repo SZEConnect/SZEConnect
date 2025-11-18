@@ -767,6 +767,55 @@ app.get("/user/groups", async (req, res) => {
   }
 });
 
+
+// --------------------
+// POSTS ENDPOINTS
+// --------------------
+
+// Get all posts with user and group info
+app.get("/posts", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        p.post_id,
+        p.title,
+        p.content,
+        p.post_date,
+        p.user_id,
+        p.group_id,
+        u.username,
+        u.major,
+        g.group_name
+      FROM posts p
+      LEFT JOIN users u ON p.user_id = u.user_id
+      LEFT JOIN groupok g ON p.group_id = g.group_id
+      ORDER BY p.post_date DESC
+    `);
+
+    res.json({
+      success: true,
+      total: result.rows.length,
+      posts: result.rows.map(post => ({
+        id: post.post_id,
+        title: post.title,
+        content: post.content,
+        time: post.post_date,
+        authorId: post.user_id,
+        authorName: post.username,
+        groupId: post.group_id,
+        group: post.group_name,
+        major: post.major
+      }))
+    });
+
+  } catch (error) {
+    console.error("❌ Error fetching posts:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to fetch posts" 
+    });
+  }
+});
 // --------------------
 // DEV UTILITY ENDPOINTS
 // --------------------
