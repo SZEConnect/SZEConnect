@@ -995,6 +995,115 @@ app.post("/posts/:postId/comments", async (req, res) => {
     });
   }
 });
+
+// --------------------
+// POST CREATION ENDPOINT
+// --------------------
+
+// Create a new post
+app.post("/posts", async (req, res) => {
+  try {
+    const authHeader = req.headers["authorization"];
+    if (!authHeader) {
+      return res.status(401).json({ 
+        success: false, 
+        message: "Authorization token required" 
+      });
+    }
+
+    const token = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : authHeader;
+    const decoded = jwt.verify(token, secret);
+    
+    const userId = decoded.id;
+    const { title, content, groupId } = req.body;
+
+    // Validation
+    if (!title || title.trim() === '') {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Post title is required" 
+      });
+    }
+
+    if (!groupId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Group selection is required" 
+      });
+    }
+
+    // Check if group exists
+    const groupResult = await pool.query(
+      'SELECT * FROM groupok WHERE group_id = $1',
+      [groupId]
+    );
+    
+    if (groupResult.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Group not found" 
+      });
+    }
+
+    // Check if user exists
+    const userResult = await pool.query(
+      'SELECT * FROM users WHERE user_id = $1',
+      [userId]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "User not found" 
+      });
+    }
+
+    // Insert the post
+    const result = await pool.query(
+      `INSERT INTO posts 
+       (user_id, group_id, title, content, post_date)
+       VALUES ($1, $2, $3, $4, $5) 
+       RETURNING *`,
+      [
+        userId,
+        groupId,
+        title.trim(),
+        content ? content.trim() : null,
+        new Date()
+      ]
+    );
+
+    // Get user and group info for the response
+    const user = userResult.rows[0];
+    const group = groupResult.rows[0];
+
+    const newPost = result.rows[0];
+
+    console.log(`✅ User ${userId} created post in group ${groupId}`);
+
+    res.status(201).json({
+      success: true,
+      message: "Post created successfully",
+      post: {
+        id: newPost.post_id,
+        title: newPost.title,
+        content: newPost.content,
+        time: newPost.post_date,
+        userId: userId,
+        authorName: user.username,
+        groupId: groupId,
+        group: group.group_name
+      }
+    });
+    
+  } catch (error) {
+    console.error("❌ Error creating post:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to create post" 
+    });
+  }
+});
 // --------------------
 // DEV UTILITY ENDPOINTS
 // --------------------
