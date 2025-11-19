@@ -1,14 +1,14 @@
 import dotenv from 'dotenv';
-dotenv.config();
 import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
 import pool, { testConnection } from './database.js';
-
 import { sendWelcomeEmail, testEmailConnection } from './services/emailService.js';
+import multer from 'multer';
+import path from 'path';
 
-
+dotenv.config();
 
 console.log('🔧 Environment Check for Render:');
 console.log('   IDATABASE_URL:', process.env.DATABASE_URL ? 'SET' : 'NOT SET');
@@ -27,7 +27,7 @@ app.use(cors({
 
 app.options('*', cors());
 app.use(express.json());
-
+app.use('/uploads', express.static('uploads'));
 // Environment variables
 const PORT = process.env.PORT || 4000;
 const secret = process.env.JWT_SECRET;
@@ -773,8 +773,6 @@ app.get("/user/groups", async (req, res) => {
 // --------------------
 // POSTS ENDPOINTS
 // --------------------
-
-// Get all posts with user and group info
 app.get("/posts", async (req, res) => {
   try {
     const result = await pool.query(`
@@ -785,6 +783,7 @@ app.get("/posts", async (req, res) => {
         p.post_date,
         p.user_id,
         p.group_id,
+        p.image_video,  // ADD THIS FIELD
         u.username,
         u.major,
         g.group_name
@@ -806,7 +805,9 @@ app.get("/posts", async (req, res) => {
         authorName: post.username,
         groupId: post.group_id,
         group: post.group_name,
-        major: post.major
+        major: post.major,
+        // ADD THIS: Parse the JSON array from image_video field
+        images: post.image_video ? JSON.parse(post.image_video) : []
       }))
     });
 
@@ -818,6 +819,7 @@ app.get("/posts", async (req, res) => {
     });
   }
 });
+
 // --------------------
 // COMMENTS ENDPOINTS (UPDATED FOR NESTED COMMENTS)
 // --------------------
@@ -999,11 +1001,38 @@ app.post("/posts/:postId/comments", async (req, res) => {
 });
 
 // --------------------
-// POST CREATION ENDPOINT
+// POST CREATION ENDPOINT WITH IMAGES
 // --------------------
 
-// Create a new post
-app.post("/posts", async (req, res) => {
+
+
+// Configure multer for file uploads (add this at the top of your file)
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/'); // Make sure this directory exists
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'post-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'), false);
+    }
+  }
+});
+
+// Update the endpoint to use multer
+app.post("/posts", upload.array('images', 5), async (req, res) => {
   try {
     const authHeader = req.headers["authorization"];
     if (!authHeader) {
@@ -1060,18 +1089,26 @@ app.post("/posts", async (req, res) => {
       });
     }
 
-    // Insert the post
+    // Handle multiple images - store as JSON array
+    let imageVideoUrl = null;
+    if (req.files && req.files.length > 0) {
+      const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
+      imageVideoUrl = JSON.stringify(imageUrls);
+    }
+
+    // Insert the post with image_video field
     const result = await pool.query(
       `INSERT INTO posts 
-       (user_id, group_id, title, content, post_date)
-       VALUES ($1, $2, $3, $4, $5) 
+       (user_id, group_id, title, content, post_date, image_video)
+       VALUES ($1, $2, $3, $4, $5, $6) 
        RETURNING *`,
       [
         userId,
         groupId,
         title.trim(),
         content ? content.trim() : null,
-        new Date()
+        new Date(),
+        imageVideoUrl  // Store JSON array of image URLs
       ]
     );
 
@@ -1081,7 +1118,7 @@ app.post("/posts", async (req, res) => {
 
     const newPost = result.rows[0];
 
-    console.log(`✅ User ${userId} created post in group ${groupId}`);
+    console.log(`✅ User ${userId} created post in group ${groupId} with ${req.files?.length || 0} images`);
 
     res.status(201).json({
       success: true,
@@ -1094,7 +1131,9 @@ app.post("/posts", async (req, res) => {
         userId: userId,
         authorName: user.username,
         groupId: groupId,
-        group: group.group_name
+        group: group.group_name,
+        // Include images in the response
+        images: imageVideoUrl ? JSON.parse(imageVideoUrl) : []
       }
     });
     
@@ -1343,4 +1382,3 @@ app.get("/status", async (req, res) => {
     });
   }
 });
-
