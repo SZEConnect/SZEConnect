@@ -7,8 +7,38 @@ import pool, { testConnection } from './database.js';
 import { sendWelcomeEmail, testEmailConnection } from './services/emailService.js';
 import multer from 'multer';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Add this for ES modules __dirname equivalent
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
+
+// Add Multer configuration HERE
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(__dirname, 'uploads')); // Use absolute path
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'post-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'), false);
+    }
+  }
+});
 
 console.log('🔧 Environment Check for Render:');
 console.log('   IDATABASE_URL:', process.env.DATABASE_URL ? 'SET' : 'NOT SET');
