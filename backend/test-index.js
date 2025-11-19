@@ -508,14 +508,19 @@ app.get("/users", async (req, res) => {
 // --------------------
 
 // Get all available groups from database
+// Get all available groups from database - UPDATED WITH MEMBER COUNTS
 app.get("/groups", async (req, res) => {
   try {
     const { category, major, search } = req.query;
     
     let query = `
-      SELECT g.*, u.username as creator_name 
+      SELECT 
+        g.*, 
+        u.username as creator_name,
+        COUNT(f.user_id) as member_count
       FROM groupok g 
       LEFT JOIN users u ON g.creator_id = u.user_id
+      LEFT JOIN followings f ON g.group_id = f.group_id
     `;
     let params = [];
     let conditions = [];
@@ -529,7 +534,7 @@ app.get("/groups", async (req, res) => {
       query += ' WHERE ' + conditions.join(' AND ');
     }
 
-    query += ' ORDER BY g.group_name';
+    query += ' GROUP BY g.group_id, u.username ORDER BY g.group_name';
 
     const result = await pool.query(query, params);
     
@@ -541,6 +546,7 @@ app.get("/groups", async (req, res) => {
         name: g.group_name,
         description: g.description,
         creator: g.creator_name,
+        memberCount: parseInt(g.member_count) || 0, // ADD THIS LINE
         createdAt: g.created_at
       }))
     });
@@ -552,7 +558,7 @@ app.get("/groups", async (req, res) => {
       message: "Failed to fetch groups" 
     });
   }
-});
+}); 
 
 // Get a specific group by ID
 app.get("/groups/:groupId", async (req, res) => {
@@ -801,7 +807,42 @@ app.get("/user/groups", async (req, res) => {
     });
   }
 });
+// Check if user is following a group
+app.get("/groups/:groupId/following", async (req, res) => {
+  try {
+    const authHeader = req.headers["authorization"];
+    if (!authHeader) {
+      return res.json({ 
+        success: true, 
+        following: false 
+      });
+    }
 
+    const token = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : authHeader;
+    const decoded = jwt.verify(token, secret);
+    
+    const userId = decoded.id;
+    const groupId = parseInt(req.params.groupId);
+    
+    // Check if user is following this group
+    const followingResult = await pool.query(
+      'SELECT * FROM followings WHERE user_id = $1 AND group_id = $2',
+      [userId, groupId]
+    );
+    
+    res.json({
+      success: true,
+      following: followingResult.rows.length > 0
+    });
+    
+  } catch (error) {
+    console.error("❌ Error checking follow status:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to check follow status" 
+    });
+  }
+});
 
 // --------------------
 // POSTS ENDPOINTS
