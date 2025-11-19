@@ -6,24 +6,49 @@ import cors from 'cors';
 import pool, { testConnection } from './database.js';
 import { sendWelcomeEmail, testEmailConnection } from './services/emailService.js';
 import multer from 'multer';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import cloudinary from 'cloudinary';
+import { CloudinaryStorage } from 'multer-storage-cloudinary';
 
-// Add this for ES modules __dirname equivalent
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Cloudinary Configuration
+cloudinary.v2.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
-dotenv.config();
+console.log('🔧 Environment Check for Render:');
+console.log('   DATABASE_URL:', process.env.DATABASE_URL ? 'SET' : 'NOT SET');
+console.log('   JWT_SECRET:', process.env.JWT_SECRET ? 'SET' : 'NOT SET');
+console.log('   CLOUDINARY_CLOUD_NAME:', process.env.CLOUDINARY_CLOUD_NAME ? 'SET' : 'NOT SET');
+console.log('   CLOUDINARY_API_KEY:', process.env.CLOUDINARY_API_KEY ? 'SET' : 'NOT SET');
+console.log('   PORT:', process.env.PORT);
 
-// Add Multer configuration HERE
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, 'uploads')); // Use absolute path
+const app = express();
+
+// ✅ CRITICAL: Add CORS support BEFORE routes
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+app.options('*', cors());
+app.use(express.json());
+
+// Environment variables
+const PORT = process.env.PORT || 4000;
+const secret = process.env.JWT_SECRET;
+
+// Configure multer to use Cloudinary
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary.v2,
+  params: {
+    folder: 'szeconnect-posts',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+    public_id: (req, file) => {
+      return 'post-' + Date.now() + '-' + Math.round(Math.random() * 1E9);
+    },
   },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'post-' + uniqueSuffix + path.extname(file.originalname));
-  }
 });
 
 const upload = multer({
@@ -39,31 +64,6 @@ const upload = multer({
     }
   }
 });
-
-console.log('🔧 Environment Check for Render:');
-console.log('   IDATABASE_URL:', process.env.DATABASE_URL ? 'SET' : 'NOT SET');
-console.log('   DATABASE_URL:', process.env.DATABASE_URL ? 'SET' : 'NOT SET');
-console.log('   JWT_SECRET:', process.env.JWT_SECRET ? 'SET' : 'NOT SET');
-console.log('   PORT:', process.env.PORT);
-// Add this right after your multer configuration
-console.log('🔐 JWT_SECRET loaded:', process.env.JWT_SECRET ? 'YES' : 'NO');
-console.log('🌐 Current NODE_ENV:', process.env.NODE_ENV);
-
-const app = express();
-
-// ✅ CRITICAL: Add CORS support BEFORE routes
-app.use(cors({
-  origin: '*', // for testing: allow all origins
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
-app.options('*', cors());
-app.use(express.json());
-app.use('/uploads', express.static('uploads'));
-// Environment variables
-const PORT = process.env.PORT || 4000;
-const secret = process.env.JWT_SECRET;
 
 // --------------------
 // ROOT ROUTE
@@ -138,6 +138,7 @@ app.get("/test-db", async (req, res) => {
     });
   }
 });
+
 // --------------------
 // ENHANCED REGISTER ROUTE WITH NEW FIELDS + EMAIL
 // --------------------
@@ -269,16 +270,16 @@ app.post("/register", async (req, res) => {
          (username, neptun_code, fullname, birthdate, gender, email, start_year, major, bio, password_hash)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
         [
-          normalizedUsername,      // $1
-          normalizedNeptun,        // $2  
-          normalizedFullName,      // $3
-          birthYear ? `${birthYear}-01-01` : null,  // $4
-          gender,                  // $5
-          normalizedEmail,         // $6
-          parseInt(startYear),     // $7
-          normalizedMajor,         // $8
-          normalizedBio,           // $9
-          hashedPassword           // $10
+          normalizedUsername,
+          normalizedNeptun,
+          normalizedFullName,
+          birthYear ? `${birthYear}-01-01` : null,
+          gender,
+          normalizedEmail,
+          parseInt(startYear),
+          normalizedMajor,
+          normalizedBio,
+          hashedPassword
         ]
       );
 
@@ -318,7 +319,6 @@ app.post("/register", async (req, res) => {
     // ========================
     // 🎉 EMAIL INTEGRATION
     // ========================
-    // Send welcome email ASYNCHRONOUSLY (don't wait for it)
     sendWelcomeEmail(newUser)
       .then(emailResult => {
         if (emailResult && emailResult.success) {
@@ -373,7 +373,6 @@ app.post("/login", async (req, res) => {
       return res.status(400).json({ message: "Neptun and password are required" });
     }
 
-    // Query PostgreSQL database
     const result = await pool.query(
       'SELECT * FROM users WHERE neptun_code = $1',
       [neptun.toUpperCase()]
@@ -437,7 +436,6 @@ app.get("/profile", async (req, res) => {
 
     const decoded = jwt.verify(token, secret);
     
-    // Find user in PostgreSQL database
     const result = await pool.query(
       'SELECT * FROM users WHERE user_id = $1',
       [decoded.id]
@@ -506,8 +504,6 @@ app.get("/users", async (req, res) => {
 // --------------------
 // GROUP ENDPOINTS (POSTGRESQL)
 // --------------------
-
-// Get all available groups from database
 app.get("/groups", async (req, res) => {
   try {
     const { category, major, search } = req.query;
@@ -554,7 +550,6 @@ app.get("/groups", async (req, res) => {
   }
 });
 
-// Get a specific group by ID
 app.get("/groups/:groupId", async (req, res) => {
   try {
     const groupId = parseInt(req.params.groupId);
@@ -576,7 +571,6 @@ app.get("/groups/:groupId", async (req, res) => {
 
     const group = groupResult.rows[0];
 
-    // Get members of this group
     const membersResult = await pool.query(
       `SELECT u.user_id, u.username, u.major, u.start_year 
        FROM followings f
@@ -607,7 +601,6 @@ app.get("/groups/:groupId", async (req, res) => {
   }
 });
 
-// Join a group
 app.post("/groups/:groupId/join", async (req, res) => {
   try {
     const authHeader = req.headers["authorization"];
@@ -624,7 +617,6 @@ app.post("/groups/:groupId/join", async (req, res) => {
     const userId = decoded.id;
     const groupId = parseInt(req.params.groupId);
     
-    // Check if group exists
     const groupResult = await pool.query(
       'SELECT * FROM groupok WHERE group_id = $1',
       [groupId]
@@ -639,7 +631,6 @@ app.post("/groups/:groupId/join", async (req, res) => {
     
     const group = groupResult.rows[0];
     
-    // Check if user exists
     const userResult = await pool.query(
       'SELECT * FROM users WHERE user_id = $1',
       [userId]
@@ -652,7 +643,6 @@ app.post("/groups/:groupId/join", async (req, res) => {
       });
     }
     
-    // Check if already joined
     const existingMembership = await pool.query(
       'SELECT * FROM followings WHERE user_id = $1 AND group_id = $2',
       [userId, groupId]
@@ -665,7 +655,6 @@ app.post("/groups/:groupId/join", async (req, res) => {
       });
     }
     
-    // Add membership
     await pool.query(
       'INSERT INTO followings (user_id, group_id) VALUES ($1, $2)',
       [userId, groupId]
@@ -691,7 +680,6 @@ app.post("/groups/:groupId/join", async (req, res) => {
   }
 });
 
-// Leave a group
 app.post("/groups/:groupId/leave", async (req, res) => {
   try {
     const authHeader = req.headers["authorization"];
@@ -708,7 +696,6 @@ app.post("/groups/:groupId/leave", async (req, res) => {
     const userId = decoded.id;
     const groupId = parseInt(req.params.groupId);
     
-    // Check if group exists
     const groupResult = await pool.query(
       'SELECT * FROM groupok WHERE group_id = $1',
       [groupId]
@@ -723,7 +710,6 @@ app.post("/groups/:groupId/leave", async (req, res) => {
     
     const group = groupResult.rows[0];
     
-    // Remove membership
     const result = await pool.query(
       'DELETE FROM followings WHERE user_id = $1 AND group_id = $2',
       [userId, groupId]
@@ -756,7 +742,6 @@ app.post("/groups/:groupId/leave", async (req, res) => {
   }
 });
 
-// Get user's joined groups
 app.get("/user/groups", async (req, res) => {
   try {
     const authHeader = req.headers["authorization"];
@@ -801,7 +786,6 @@ app.get("/user/groups", async (req, res) => {
     });
   }
 });
-
 
 // --------------------
 // POSTS ENDPOINTS
@@ -853,15 +837,12 @@ app.get("/posts", async (req, res) => {
 });
 
 // --------------------
-// COMMENTS ENDPOINTS (UPDATED FOR NESTED COMMENTS)
+// COMMENTS ENDPOINTS
 // --------------------
-
-// Get comments for a post (with nested replies)
 app.get("/posts/:postId/comments", async (req, res) => {
   try {
     const postId = parseInt(req.params.postId);
     
-    // Get top-level comments (no parent)
     const result = await pool.query(`
       SELECT 
         c.comment_id,
@@ -876,7 +857,6 @@ app.get("/posts/:postId/comments", async (req, res) => {
       ORDER BY c.comment_date ASC
     `, [postId]);
 
-    // Get replies for each comment
     const commentsWithReplies = await Promise.all(
       result.rows.map(async (comment) => {
         const repliesResult = await pool.query(`
@@ -927,7 +907,6 @@ app.get("/posts/:postId/comments", async (req, res) => {
   }
 });
 
-// Add a new comment to a post (top-level or reply)
 app.post("/posts/:postId/comments", async (req, res) => {
   try {
     const authHeader = req.headers["authorization"];
@@ -952,7 +931,6 @@ app.post("/posts/:postId/comments", async (req, res) => {
       });
     }
 
-    // Check if post exists
     const postResult = await pool.query(
       'SELECT * FROM posts WHERE post_id = $1',
       [postId]
@@ -965,7 +943,6 @@ app.post("/posts/:postId/comments", async (req, res) => {
       });
     }
 
-    // If it's a reply, check if parent comment exists
     if (parentCommentId) {
       const parentResult = await pool.query(
         'SELECT * FROM comments WHERE comment_id = $1 AND post_id = $2',
@@ -980,7 +957,6 @@ app.post("/posts/:postId/comments", async (req, res) => {
       }
     }
 
-    // Insert the comment
     const result = await pool.query(
       `INSERT INTO comments 
        (post_id, user_id, parent_comment_id, comment, comment_date, comment_update, comment_edited, comment_deleted)
@@ -989,16 +965,15 @@ app.post("/posts/:postId/comments", async (req, res) => {
       [
         postId,
         userId,
-        parentCommentId || null, // null for top-level comments
+        parentCommentId || null,
         comment.trim(),
-        new Date(), // comment_date
-        new Date(), // comment_update
-        'N',        // comment_edited
-        null        // comment_deleted
+        new Date(),
+        new Date(),
+        'N',
+        null
       ]
     );
 
-    // Get user info for the response
     const userResult = await pool.query(
       'SELECT username, major FROM users WHERE user_id = $1',
       [userId]
@@ -1019,7 +994,7 @@ app.post("/posts/:postId/comments", async (req, res) => {
         userId: userId,
         userName: user.username,
         userMajor: user.major,
-        replies: [] // New comments start with empty replies array
+        replies: []
       }
     });
     
@@ -1033,10 +1008,8 @@ app.post("/posts/:postId/comments", async (req, res) => {
 });
 
 // --------------------
-// POST CREATION ENDPOINT WITH IMAGES - FIXED
+// POST CREATION ENDPOINT WITH CLOUDINARY
 // --------------------
-
-// Create a wrapper function to extract token before multer
 const authenticateToken = (req, res, next) => {
   try {
     const authHeader = req.headers["authorization"];
@@ -1049,9 +1022,8 @@ const authenticateToken = (req, res, next) => {
 
     const token = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : authHeader;
     
-    // Verify the token immediately
     const decoded = jwt.verify(token, secret);
-    req.user = decoded; // Attach user to request
+    req.user = decoded;
     next();
   } catch (error) {
     console.error("❌ JWT verification failed:", error.message);
@@ -1062,15 +1034,16 @@ const authenticateToken = (req, res, next) => {
   }
 };
 
-// Update the endpoint - authenticate FIRST, then multer
 app.post("/posts", authenticateToken, upload.array('images', 5), async (req, res) => {
   try {
-    const userId = req.user.id; // Now we get user from the authenticated request
+    console.log("🔄 POST /posts - Starting request with Cloudinary");
+    
+    const userId = req.user.id;
     const { title, content, groupId } = req.body;
 
-    console.log("🔄 Creating post for user:", userId);
+    console.log("📝 Request data:", { userId, title, groupId });
+    console.log("📁 Files received:", req.files ? req.files.length : 0);
 
-    // Validation
     if (!title || title.trim() === '') {
       return res.status(400).json({ 
         success: false, 
@@ -1085,7 +1058,6 @@ app.post("/posts", authenticateToken, upload.array('images', 5), async (req, res
       });
     }
 
-    // Check if group exists
     const groupResult = await pool.query(
       'SELECT * FROM groupok WHERE group_id = $1',
       [groupId]
@@ -1098,7 +1070,6 @@ app.post("/posts", authenticateToken, upload.array('images', 5), async (req, res
       });
     }
 
-    // Check if user exists (optional, since we already authenticated)
     const userResult = await pool.query(
       'SELECT * FROM users WHERE user_id = $1',
       [userId]
@@ -1111,14 +1082,18 @@ app.post("/posts", authenticateToken, upload.array('images', 5), async (req, res
       });
     }
 
-    // Handle multiple images - store as JSON array
+    // Handle images with Cloudinary
     let imageVideoUrl = null;
     if (req.files && req.files.length > 0) {
-      const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
+      console.log("🖼️ Processing images with Cloudinary...");
+      
+      // Cloudinary automatically provides URLs in file.path
+      const imageUrls = req.files.map(file => file.path);
       imageVideoUrl = JSON.stringify(imageUrls);
+      
+      console.log("✅ Cloudinary URLs:", imageUrls);
     }
 
-    // Insert the post with image_video field
     const result = await pool.query(
       `INSERT INTO posts 
        (user_id, group_id, title, content, post_date, image_video)
@@ -1134,10 +1109,10 @@ app.post("/posts", authenticateToken, upload.array('images', 5), async (req, res
       ]
     );
 
-    // Get user and group info for the response
+    console.log("✅ Post inserted successfully");
+
     const user = userResult.rows[0];
     const group = groupResult.rows[0];
-
     const newPost = result.rows[0];
 
     console.log(`✅ User ${userId} created post in group ${groupId} with ${req.files?.length || 0} images`);
@@ -1159,18 +1134,20 @@ app.post("/posts", authenticateToken, upload.array('images', 5), async (req, res
     });
     
   } catch (error) {
-    console.error("❌ Error creating post:", error);
+    console.error("❌ Error creating post:", {
+      message: error.message,
+      stack: error.stack
+    });
     res.status(500).json({ 
       success: false, 
       message: "Failed to create post" 
     });
   }
 });
+
 // --------------------
 // DEV UTILITY ENDPOINTS
 // --------------------
-
-// Get server statistics
 app.get('/dev/stats', async (req, res) => {
   try {
     const usersCount = await pool.query('SELECT COUNT(*) FROM users');
@@ -1192,7 +1169,6 @@ app.get('/dev/stats', async (req, res) => {
   }
 });
 
-// Create test user quickly
 app.post('/dev/test-user', async (req, res) => {
   try {
     const testId = Date.now().toString().slice(-4);
@@ -1243,12 +1219,8 @@ app.post('/dev/test-user', async (req, res) => {
   }
 });
 
-// --------------------
-// EMAIL TEST ENDPOINT
-// --------------------
 app.get('/test-email', async (req, res) => {
   try {
-    // Test email configuration
     const connectionTest = await testEmailConnection();
     
     if (!connectionTest) {
@@ -1258,9 +1230,8 @@ app.get('/test-email', async (req, res) => {
       });
     }
 
-    // Test sending an email
     const testUser = {
-      email: process.env.EMAIL_USER, // Send to yourself for testing
+      email: process.env.EMAIL_USER,
       username: "TestUser",
       neptun: "TEST99",
       major: "Computer Science",
@@ -1330,26 +1301,23 @@ app.listen(PORT, async () => {
   console.log(`📊 PORT: ${PORT}`);
   console.log(`🔐 JWT_SECRET: ${secret ? 'SET' : 'NOT SET!'}`);
   console.log(`🗃️ DATABASE_URL: ${process.env.DATABASE_URL ? 'SET' : 'NOT SET!'}`);
+  console.log(`☁️  CLOUDINARY: ${process.env.CLOUDINARY_CLOUD_NAME ? 'SET' : 'NOT SET!'}`);
   console.log(`🌐 Public API URL: https://szeconnect.onrender.com`);
   
-  // Test database connection
-  console.log('🔄 Testing database connection...');
   const dbConnected = await testConnection();
   
   console.log('='.repeat(60));
   if (dbConnected) {
     console.log('✅ SERVER STARTED SUCCESSFULLY!');
     console.log('   Backend → Database: INTERNAL URL ✓');
+    console.log('   Image Storage → Cloudinary ✓');
     console.log('   Frontend → Backend: https://szeconnect.onrender.com ✓');
-    console.log('   Friend\'s computer can connect to API ✓');
   } else {
     console.log('⚠️  SERVER STARTED BUT DATABASE CONNECTION FAILED');
-    console.log('💡 Check DATABASE_URL in Render environment');
   }
   console.log(`🌐 Server running on port ${PORT}`);
   console.log('='.repeat(60));
   
-  // Test email connection
   testEmailConnection().then(connected => {
     if (connected) {
       console.log(`📧 Email service: READY`);
@@ -1359,12 +1327,8 @@ app.listen(PORT, async () => {
   });
 });
 
-// --------------------
-// STATUS ENDPOINT (for frontend testing)
-// --------------------
 app.get("/status", async (req, res) => {
   try {
-    // Test database connection
     const dbResult = await pool.query('SELECT NOW() as db_time');
     
     res.json({
@@ -1373,24 +1337,16 @@ app.get("/status", async (req, res) => {
       services: {
         database: "Connected",
         server: "Running", 
-        api: "Ready for frontend connections",
-        connection: process.env.DATABASE_URL ? "Internal URL" : "External URL"
+        cloudinary: process.env.CLOUDINARY_CLOUD_NAME ? "Ready" : "Not configured",
+        api: "Ready for frontend connections"
       },
       database: {
         time: dbResult.rows[0].db_time,
-        connection: process.env.DATABASE_URL ? "Internal" : "External",
-        ssl: process.env.DATABASE_URL ? "Disabled" : "Enabled"
+        connection: process.env.DATABASE_URL ? "Internal" : "External"
       },
       api: {
         baseUrl: "https://szeconnect.onrender.com",
-        frontendInstructions: "Your friend can connect their frontend to this URL",
-        exampleEndpoints: [
-          "GET /status",
-          "POST /register", 
-          "POST /login",
-          "GET /groups",
-          "GET /users"
-        ]
+        frontendInstructions: "Your friend can connect their frontend to this URL"
       },
       timestamp: new Date().toISOString()
     });
@@ -1398,8 +1354,7 @@ app.get("/status", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Backend running but database connection failed",
-      error: error.message,
-      connection: process.env.DATABASE_URL ? "Internal URL" : "External URL"
+      error: error.message
     });
   }
 });
