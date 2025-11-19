@@ -1374,6 +1374,114 @@ app.post("/posts/:postId/like", async (req, res) => {
     });
   }
 });
+
+// --------------------
+// SEARCH ENDPOINTS
+// --------------------
+
+// Search groups
+app.get("/search/groups", async (req, res) => {
+  try {
+    const { q } = req.query;
+    
+    if (!q || q.trim() === '') {
+      return res.json({
+        success: true,
+        groups: []
+      });
+    }
+
+    const searchTerm = `%${q.trim()}%`;
+    
+    const result = await pool.query(`
+      SELECT 
+        g.*, 
+        u.username as creator_name,
+        COUNT(f.user_id) as member_count,
+        COUNT(p.post_id) as post_count
+      FROM groupok g 
+      LEFT JOIN users u ON g.creator_id = u.user_id
+      LEFT JOIN followings f ON g.group_id = f.group_id
+      LEFT JOIN posts p ON g.group_id = p.group_id
+      WHERE g.group_name ILIKE $1 OR g.description ILIKE $1
+      GROUP BY g.group_id, u.username
+      ORDER BY g.group_name
+    `, [searchTerm]);
+
+    res.json({
+      success: true,
+      groups: result.rows.map(g => ({
+        id: g.group_id,
+        name: g.group_name,
+        description: g.description,
+        creator: g.creator_name,
+        memberCount: parseInt(g.member_count) || 0,
+        postCount: parseInt(g.post_count) || 0,
+        createdAt: g.created_at
+      }))
+    });
+
+  } catch (error) {
+    console.error("❌ Error searching groups:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to search groups" 
+    });
+  }
+});
+
+// Search users
+app.get("/search/users", async (req, res) => {
+  try {
+    const { q } = req.query;
+    
+    if (!q || q.trim() === '') {
+      return res.json({
+        success: true,
+        users: []
+      });
+    }
+
+    const searchTerm = `%${q.trim()}%`;
+    
+    const result = await pool.query(`
+      SELECT 
+        user_id,
+        username,
+        email,
+        neptun_code,
+        major,
+        start_year,
+        fullname
+      FROM users 
+      WHERE username ILIKE $1 
+         OR email ILIKE $1 
+         OR neptun_code ILIKE $1 
+         OR fullname ILIKE $1
+      ORDER BY username
+    `, [searchTerm]);
+
+    res.json({
+      success: true,
+      users: result.rows.map(u => ({
+        id: u.user_id,
+        username: u.username,
+        email: u.email,
+        neptun: u.neptun_code,
+        major: u.major,
+        startYear: u.start_year,
+        fullName: u.fullname
+      }))
+    });
+
+  } catch (error) {
+    console.error("❌ Error searching users:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to search users" 
+    });
+  }
+});
 // --------------------
 // DEV UTILITY ENDPOINTS
 // --------------------
