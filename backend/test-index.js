@@ -816,7 +816,7 @@ app.get("/posts", async (req, res) => {
         p.post_date,
         p.user_id,
         p.group_id,
-        p.image_video,  // ADD THIS FIELD
+        p.image_video,
         u.username,
         u.major,
         g.group_name
@@ -839,7 +839,6 @@ app.get("/posts", async (req, res) => {
         groupId: post.group_id,
         group: post.group_name,
         major: post.major,
-        // ADD THIS: Parse the JSON array from image_video field
         images: post.image_video ? JSON.parse(post.image_video) : []
       }))
     });
