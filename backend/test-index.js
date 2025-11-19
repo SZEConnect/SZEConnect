@@ -1,12 +1,14 @@
 import dotenv from 'dotenv';
+dotenv.config();
 import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
 import pool, { testConnection } from './database.js';
+
 import { sendWelcomeEmail, testEmailConnection } from './services/emailService.js';
 
-dotenv.config();
+
 
 console.log('🔧 Environment Check for Render:');
 console.log('   IDATABASE_URL:', process.env.DATABASE_URL ? 'SET' : 'NOT SET');
@@ -1341,3 +1343,4 @@ app.get("/status", async (req, res) => {
     });
   }
 });
+
