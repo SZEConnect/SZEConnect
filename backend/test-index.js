@@ -823,7 +823,8 @@ app.get("/posts", async (req, res) => {
         groupId: post.group_id,
         group: post.group_name,
         major: post.major,
-        images: post.image_video ? JSON.parse(post.image_video) : []
+        images: post.image_video ? JSON.parse(post.image_video) : [],
+        hasImages: !!post.image_video
       }))
     });
 
@@ -1358,3 +1359,4 @@ app.get("/status", async (req, res) => {
     });
   }
 });
+
