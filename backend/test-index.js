@@ -45,6 +45,9 @@ console.log('   IDATABASE_URL:', process.env.DATABASE_URL ? 'SET' : 'NOT SET');
 console.log('   DATABASE_URL:', process.env.DATABASE_URL ? 'SET' : 'NOT SET');
 console.log('   JWT_SECRET:', process.env.JWT_SECRET ? 'SET' : 'NOT SET');
 console.log('   PORT:', process.env.PORT);
+// Add this right after your multer configuration
+console.log('🔐 JWT_SECRET loaded:', process.env.JWT_SECRET ? 'YES' : 'NO');
+console.log('🌐 Current NODE_ENV:', process.env.NODE_ENV);
 
 const app = express();
 
