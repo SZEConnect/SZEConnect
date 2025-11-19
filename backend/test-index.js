@@ -1001,38 +1001,11 @@ app.post("/posts/:postId/comments", async (req, res) => {
 });
 
 // --------------------
-// POST CREATION ENDPOINT WITH IMAGES
+// POST CREATION ENDPOINT WITH IMAGES - FIXED
 // --------------------
 
-
-
-// Configure multer for file uploads (add this at the top of your file)
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/'); // Make sure this directory exists
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'post-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
-  },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed'), false);
-    }
-  }
-});
-
-// Update the endpoint to use multer
-app.post("/posts", upload.array('images', 5), async (req, res) => {
+// Create a wrapper function to extract token before multer
+const authenticateToken = (req, res, next) => {
   try {
     const authHeader = req.headers["authorization"];
     if (!authHeader) {
@@ -1043,10 +1016,27 @@ app.post("/posts", upload.array('images', 5), async (req, res) => {
     }
 
     const token = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : authHeader;
-    const decoded = jwt.verify(token, secret);
     
-    const userId = decoded.id;
+    // Verify the token immediately
+    const decoded = jwt.verify(token, secret);
+    req.user = decoded; // Attach user to request
+    next();
+  } catch (error) {
+    console.error("❌ JWT verification failed:", error.message);
+    return res.status(403).json({ 
+      success: false, 
+      message: "Invalid or expired token" 
+    });
+  }
+};
+
+// Update the endpoint - authenticate FIRST, then multer
+app.post("/posts", authenticateToken, upload.array('images', 5), async (req, res) => {
+  try {
+    const userId = req.user.id; // Now we get user from the authenticated request
     const { title, content, groupId } = req.body;
+
+    console.log("🔄 Creating post for user:", userId);
 
     // Validation
     if (!title || title.trim() === '') {
@@ -1076,7 +1066,7 @@ app.post("/posts", upload.array('images', 5), async (req, res) => {
       });
     }
 
-    // Check if user exists
+    // Check if user exists (optional, since we already authenticated)
     const userResult = await pool.query(
       'SELECT * FROM users WHERE user_id = $1',
       [userId]
@@ -1108,7 +1098,7 @@ app.post("/posts", upload.array('images', 5), async (req, res) => {
         title.trim(),
         content ? content.trim() : null,
         new Date(),
-        imageVideoUrl  // Store JSON array of image URLs
+        imageVideoUrl
       ]
     );
 
@@ -1132,7 +1122,6 @@ app.post("/posts", upload.array('images', 5), async (req, res) => {
         authorName: user.username,
         groupId: groupId,
         group: group.group_name,
-        // Include images in the response
         images: imageVideoUrl ? JSON.parse(imageVideoUrl) : []
       }
     });
