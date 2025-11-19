@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<body>
+<button onclick="testRegistration()">Send Registration</button>
+<pre id="result"></pre>
+
+<script>
+async function testRegistration() {
+  const response = await fetch("https://szeconnect.onrender.com/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: "MaMurk",
+      neptun: "FARRXD",
+      startYear: 2023,
+      major: "Computer Dumbness",
+      email: "legyszi@gmail.com",
+      gender: "Férfi",
+      password: "Password321",
+      passwordAgain: "Password321"
+    })
+  });
+
+  const data = await response.json();
+  document.getElementById("result").textContent =
+    `Status: ${response.status}\n\n${JSON.stringify(data, null, 2)}`;
+}
+</script>
+</body>
+</html>
