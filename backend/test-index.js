@@ -311,7 +311,7 @@ app.post("/register", uploadProfile.single('profileImage'), async (req, res) => 
           normalizedMajor,         // $8
           normalizedBio,           // $9
           hashedPassword,          // $10
-          profileImageUrl          // $11 - Cloudinary URL or null
+          profile_picture_url         // $11 - Cloudinary URL or null
         ]
       );
 
@@ -1754,3 +1754,4 @@ app.get("/status", async (req, res) => {
     });
   }
 });
+
