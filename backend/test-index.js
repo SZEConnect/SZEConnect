@@ -298,7 +298,7 @@ app.post("/register", uploadProfile.single('profileImage'), async (req, res) => 
     try {
       result = await pool.query(
         `INSERT INTO users 
-         (username, neptun_code, fullname, birthdate, gender, email, start_year, major, bio, password_hash, profile_image)
+         (username, neptun_code, fullname, birthdate, gender, email, start_year, major, bio, password_hash, profile_picture_url)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
         [
           normalizedUsername,      // $1
@@ -1754,4 +1754,3 @@ app.get("/status", async (req, res) => {
     });
   }
 });
-
