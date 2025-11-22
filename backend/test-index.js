@@ -139,9 +139,9 @@ app.get("/test-db", async (req, res) => {
   }
 });
 // --------------------
-// ENHANCED REGISTER ROUTE WITH NEW FIELDS + EMAIL
+// REGISTER ENDPOINT WITH CLOUDINARY PROFILE PICTURES
 // --------------------
-app.post("/register", async (req, res) => {
+app.post("/register", uploadProfile.single('profileImage'), async (req, res) => {
   try {
     const { 
       username, 
@@ -158,6 +158,7 @@ app.post("/register", async (req, res) => {
     } = req.body;
 
     console.log("📝 Registration attempt:", { username, email, neptun });
+    console.log("📸 Profile file:", req.file ? `Uploaded: ${req.file.originalname}` : 'No file');
 
     // === MANDATORY FIELD VALIDATION ===
     const mandatoryFields = { username, neptun, startYear, major, email, password, passwordAgain };
@@ -258,6 +259,21 @@ app.post("/register", async (req, res) => {
       });
     }
 
+    // === UPLOAD PROFILE PICTURE TO CLOUDINARY ===
+    let profileImageUrl = null;
+    if (req.file) {
+      try {
+        console.log("☁️ Uploading profile picture to Cloudinary...");
+        const cloudinaryResult = await uploadToCloudinary(req.file.buffer, 'szeconnect-profiles');
+        profileImageUrl = cloudinaryResult.secure_url;
+        console.log("✅ Profile picture uploaded to Cloudinary:", profileImageUrl);
+      } catch (uploadError) {
+        console.error("❌ Cloudinary upload failed:", uploadError);
+        // Don't fail registration if image upload fails
+        console.log("⚠️ Continuing registration without profile picture");
+      }
+    }
+
     // === HASH PASSWORD ===
     const hashedPassword = await bcrypt.hash(password, 12);
 
@@ -266,8 +282,8 @@ app.post("/register", async (req, res) => {
     try {
       result = await pool.query(
         `INSERT INTO users 
-         (username, neptun_code, fullname, birthdate, gender, email, start_year, major, bio, password_hash)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+         (username, neptun_code, fullname, birthdate, gender, email, start_year, major, bio, password_hash, profile_image)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
         [
           normalizedUsername,      // $1
           normalizedNeptun,        // $2  
@@ -278,7 +294,8 @@ app.post("/register", async (req, res) => {
           parseInt(startYear),     // $7
           normalizedMajor,         // $8
           normalizedBio,           // $9
-          hashedPassword           // $10
+          hashedPassword,          // $10
+          profileImageUrl          // $11 - Cloudinary URL or null
         ]
       );
 
@@ -311,6 +328,7 @@ app.post("/register", async (req, res) => {
       fullName: result.rows[0].fullname,
       bio: result.rows[0].bio,
       gender: result.rows[0].gender,
+      profileImage: result.rows[0].profile_image, // Cloudinary URL
       birthYear: result.rows[0].birthdate ? new Date(result.rows[0].birthdate).getFullYear() : null,
       createdAt: result.rows[0].created_at || new Date().toISOString()
     };
@@ -347,6 +365,7 @@ app.post("/register", async (req, res) => {
         bio: newUser.bio,
         gender: newUser.gender,
         birthYear: newUser.birthYear,
+        profileImage: newUser.profileImage, // Include Cloudinary URL
         createdAt: newUser.createdAt
       },
       emailSent: true
