@@ -8,12 +8,41 @@ import { sendWelcomeEmail, testEmailConnection } from './services/emailService.j
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { v2 as cloudinary } from 'cloudinary';
 
 // Add this for ES modules __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config();
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// Cloudinary upload function
+const uploadToCloudinary = (fileBuffer, folder = 'szeconnect') => {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: folder,
+        resource_type: 'auto'
+      },
+      (error, result) => {
+        if (error) reject(error);
+        else resolve(result);
+      }
+    );
+    
+    const stream = require('stream');
+    const bufferStream = new stream.PassThrough();
+    bufferStream.end(fileBuffer);
+    bufferStream.pipe(uploadStream);
+  });
+};
 
 // Add Multer configuration HERE
 const storage = multer.diskStorage({
@@ -154,6 +183,7 @@ const uploadProfile = multer({
     }
   }
 });
+
 // --------------------
 // REGISTER ENDPOINT WITH CLOUDINARY PROFILE PICTURES
 // --------------------
@@ -311,7 +341,7 @@ app.post("/register", uploadProfile.single('profileImage'), async (req, res) => 
           normalizedMajor,         // $8
           normalizedBio,           // $9
           hashedPassword,          // $10
-          profile_picture_url         // $11 - Cloudinary URL or null
+          profileImageUrl          // $11 - Cloudinary URL or null
         ]
       );
 
@@ -344,7 +374,7 @@ app.post("/register", uploadProfile.single('profileImage'), async (req, res) => 
       fullName: result.rows[0].fullname,
       bio: result.rows[0].bio,
       gender: result.rows[0].gender,
-      profileImage: result.rows[0].profile_image, // Cloudinary URL
+      profileImage: result.rows[0].profile_picture_url, // Cloudinary URL
       birthYear: result.rows[0].birthdate ? new Date(result.rows[0].birthdate).getFullYear() : null,
       createdAt: result.rows[0].created_at || new Date().toISOString()
     };
@@ -497,6 +527,7 @@ app.get("/profile", async (req, res) => {
         bio: user.bio,
         gender: user.gender,
         birthdate: user.birthdate,
+        profileImage: user.profile_picture_url,
         createdAt: user.created_at
       }
     });
@@ -518,7 +549,7 @@ app.get("/profile", async (req, res) => {
 app.get("/users", async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT user_id, username, email, neptun_code, major, start_year FROM users ORDER BY user_id'
+      'SELECT user_id, username, email, neptun_code, major, start_year, profile_picture_url FROM users ORDER BY user_id'
     );
     
     res.json({
@@ -529,7 +560,8 @@ app.get("/users", async (req, res) => {
         email: u.email,
         neptun: u.neptun_code,
         major: u.major,
-        startYear: u.start_year
+        startYear: u.start_year,
+        profileImage: u.profile_picture_url
       }))
     });
   } catch (error) {
@@ -543,7 +575,6 @@ app.get("/users", async (req, res) => {
 // --------------------
 
 // Get all available groups from database
-// Get all available groups from database - UPDATED WITH MEMBER COUNTS
 app.get("/groups", async (req, res) => {
   try {
     const { category, major, search } = req.query;
@@ -581,7 +612,7 @@ app.get("/groups", async (req, res) => {
         name: g.group_name,
         description: g.description,
         creator: g.creator_name,
-        memberCount: parseInt(g.member_count) || 0, // ADD THIS LINE
+        memberCount: parseInt(g.member_count) || 0,
         createdAt: g.created_at
       }))
     });
@@ -842,6 +873,7 @@ app.get("/user/groups", async (req, res) => {
     });
   }
 });
+
 // Check if user is following a group
 app.get("/groups/:groupId/following", async (req, res) => {
   try {
@@ -1243,6 +1275,7 @@ app.post("/posts", authenticateToken, upload.array('images', 5), async (req, res
     });
   }
 });
+
 // --------------------
 // LIKES ENDPOINTS (UPDATED FOR post_likes TABLE)
 // --------------------
@@ -1487,7 +1520,8 @@ app.get("/search/users", async (req, res) => {
         neptun_code,
         major,
         start_year,
-        fullname
+        fullname,
+        profile_picture_url
       FROM users 
       WHERE username ILIKE $1 
          OR email ILIKE $1 
@@ -1505,7 +1539,8 @@ app.get("/search/users", async (req, res) => {
         neptun: u.neptun_code,
         major: u.major,
         startYear: u.start_year,
-        fullName: u.fullname
+        fullName: u.fullname,
+        profileImage: u.profile_picture_url
       }))
     });
 
@@ -1517,6 +1552,7 @@ app.get("/search/users", async (req, res) => {
     });
   }
 });
+
 // --------------------
 // DEV UTILITY ENDPOINTS
 // --------------------
