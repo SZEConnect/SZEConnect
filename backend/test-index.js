@@ -138,6 +138,22 @@ app.get("/test-db", async (req, res) => {
     });
   }
 });
+
+const profileStorage = multer.memoryStorage(); // Use memory storage for Cloudinary
+
+const uploadProfile = multer({
+  storage: profileStorage,
+  limits: {
+    fileSize: 2 * 1024 * 1024, // 2MB limit for profile pics
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'), false);
+    }
+  }
+});
 // --------------------
 // REGISTER ENDPOINT WITH CLOUDINARY PROFILE PICTURES
 // --------------------
