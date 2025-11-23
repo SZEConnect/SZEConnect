@@ -434,6 +434,44 @@ app.post("/register", uploadProfile.single('profileImage'), async (req, res) => 
   }
 });
 
+// Add this endpoint to test Cloudinary directly
+app.post("/test-cloudinary", uploadProfile.single('testImage'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No file provided" });
+    }
+
+    console.log("🧪 Testing Cloudinary upload...");
+    console.log("File details:", {
+      originalname: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+      bufferLength: req.file.buffer?.length
+    });
+
+    const cloudinaryResult = await uploadToCloudinary(req.file.buffer, 'test-uploads');
+    
+    console.log("✅ Cloudinary upload successful:", cloudinaryResult.secure_url);
+    
+    res.json({
+      success: true,
+      message: "Cloudinary upload test successful",
+      result: {
+        url: cloudinaryResult.secure_url,
+        public_id: cloudinaryResult.public_id,
+        format: cloudinaryResult.format
+      }
+    });
+  } catch (error) {
+    console.error("❌ Cloudinary test failed:", error);
+    res.status(500).json({
+      success: false,
+      message: "Cloudinary upload test failed",
+      error: error.message
+    });
+  }
+});
+
 // --------------------
 // LOGIN ROUTE (POSTGRESQL)
 // --------------------
