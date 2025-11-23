@@ -113,11 +113,34 @@ app.get("/test-db", async (req, res) => {
     });
   }
 });
+// Add multer configuration at the top of your file (after imports)
+import multer from 'multer';
+
+const profileStorage = multer.memoryStorage();
+const uploadProfile = multer({
+  storage: profileStorage,
+  limits: {
+    fileSize: 2 * 1024 * 1024, // 2MB limit for profile pics
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'), false);
+    }
+  }
+});
+
 // --------------------
-// ENHANCED REGISTER ROUTE WITH NEW FIELDS + EMAIL
+// ENHANCED REGISTER ROUTE WITH NEW FIELDS + EMAIL + PROFILE PICTURES
 // --------------------
-app.post("/register", async (req, res) => {
+app.post("/register", uploadProfile.single('profileImage'), async (req, res) => {
   try {
+    console.log("📝 Registration request received");
+    console.log("📦 Request body:", req.body);
+    console.log("📦 Request body keys:", Object.keys(req.body));
+    console.log("📸 Profile file:", req.file ? "Received" : "Not received");
+
     const { 
       username, 
       neptun, 
@@ -141,6 +164,7 @@ app.post("/register", async (req, res) => {
       .map(([key]) => key);
 
     if (missingFields.length > 0) {
+      console.log("❌ Missing fields:", missingFields);
       return res.status(400).json({ 
         success: false,
         message: "Missing required fields",
