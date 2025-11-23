@@ -1,6 +1,6 @@
 import express from "express";
 import bcrypt from "bcrypt";
-import pool from "../database.js";
+import pool from "./database.js";
 import nodemailer from "nodemailer";
 
 const router = express.Router();
@@ -88,3 +88,4 @@ Ezzel most már be tudsz jelentkezni. Belépés után érdemes módosítani a pr
 });
 
 export default router;
+
