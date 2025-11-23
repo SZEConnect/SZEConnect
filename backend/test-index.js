@@ -600,6 +600,7 @@ app.get("/profile", async (req, res) => {
         bio: user.bio,
         gender: user.gender,
         birthdate: user.birthdate,
+        profileImage: user.profile_picture_url,
         createdAt: user.created_at
       }
     });
