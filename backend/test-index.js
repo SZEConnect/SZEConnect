@@ -8,6 +8,33 @@ import { sendWelcomeEmail, testEmailConnection } from './services/emailService.j
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { v2 as cloudinary } from 'cloudinary';
+import streamifier from 'streamifier';
+
+// --- CLOUDINARY KONFIGURÁCIÓ ---
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// --- SEGÉDFÜGGVÉNY A FELTÖLTÉSHEZ (EZ HIÁNYZOTT!) ---
+const uploadToCloudinary = (buffer, folder) => {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: folder,
+        resource_type: "auto", // Kép felismerése
+      },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result);
+      }
+    );
+    // A buffer átalakítása stream-mé
+    streamifier.createReadStream(buffer).pipe(uploadStream);
+  });
+};
 
 // Add this for ES modules __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
