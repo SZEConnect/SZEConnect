@@ -10,7 +10,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { v2 as cloudinary } from 'cloudinary';
 import streamifier from 'streamifier';
-
 dotenv.config();
 
 // --- CLOUDINARY KONFIGURÁCIÓ ---
@@ -1622,6 +1621,85 @@ app.get("/search/users", async (req, res) => {
   }
 });
 // --------------------
+// GET USER PROFILE BY ID ENDPOINT
+// --------------------
+app.get("/users/:userId", async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    
+    if (!userId || isNaN(userId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid user ID" 
+      });
+    }
+
+    // Get user from PostgreSQL database
+    const result = await pool.query(
+      `SELECT 
+        user_id,
+        username,
+        email,
+        neptun_code,
+        fullname,
+        birthdate,
+        gender,
+        start_year,
+        major,
+        bio,
+        profile_picture_url,
+        created_at
+       FROM users 
+       WHERE user_id = $1`,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "User not found" 
+      });
+    }
+
+    const user = result.rows[0];
+    
+    // Parse fullname into first and last name
+    const nameParts = user.fullname ? user.fullname.split(' ') : [];
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    // Format response
+    const userProfile = {
+      id: user.user_id,
+      username: user.username,
+      email: user.email,
+      neptun: user.neptun_code,
+      fullName: user.fullname,
+      firstName: firstName,
+      lastName: lastName,
+      birthYear: user.birthdate ? new Date(user.birthdate).getFullYear() : null,
+      gender: user.gender,
+      startYear: user.start_year,
+      major: user.major,
+      bio: user.bio,
+      profileImage: user.profile_picture_url,
+      createdAt: user.created_at
+    };
+
+    res.json({
+      success: true,
+      user: userProfile
+    });
+
+  } catch (error) {
+    console.error("❌ Error fetching user profile:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to fetch user profile" 
+    });
+  }
+});
+// --------------------
 // DEV UTILITY ENDPOINTS
 // --------------------
 
@@ -1858,4 +1936,3 @@ app.get("/status", async (req, res) => {
     });
   }
 });
-
