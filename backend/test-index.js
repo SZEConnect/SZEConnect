@@ -24,6 +24,9 @@ app.use(cors({
   credentials: false // Must be false when origin is "*"
 }));
 
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 // 2. FORCE SUCCESS FOR PREFLIGHT REQUESTS
 // This manually intercepts the OPTIONS check and says "OK" immediately
 app.options('*', (req, res) => {
