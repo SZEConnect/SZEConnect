@@ -11,6 +11,8 @@ import { fileURLToPath } from 'url';
 import { v2 as cloudinary } from 'cloudinary';
 import streamifier from 'streamifier';
 
+dotenv.config();
+
 // --- CLOUDINARY KONFIGURÁCIÓ ---
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -40,7 +42,7 @@ const uploadToCloudinary = (buffer, folder) => {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config();
+
 
 // Add Multer configuration HERE
 const storage = multer.diskStorage({
@@ -1856,3 +1858,4 @@ app.get("/status", async (req, res) => {
     });
   }
 });
+
