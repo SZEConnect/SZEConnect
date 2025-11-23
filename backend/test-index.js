@@ -17,16 +17,21 @@ console.log('   PORT:', process.env.PORT);
 
 const app = express();
 
-// ✅ CRITICAL: Add CORS support BEFORE routes
 app.use(cors({
-  origin: '*', // for testing: allow all origins
+  origin: '*', 
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: false // Must be false when origin is "*"
 }));
 
-app.options('*', cors());
-app.use(express.json());
-app.use("/forgot", forgotPasswordRoute);
+// 2. FORCE SUCCESS FOR PREFLIGHT REQUESTS
+// This manually intercepts the OPTIONS check and says "OK" immediately
+app.options('*', (req, res) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.sendStatus(200);
+});
 
 // Environment variables
 const PORT = process.env.PORT || 4000;
