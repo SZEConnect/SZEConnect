@@ -8,41 +8,12 @@ import { sendWelcomeEmail, testEmailConnection } from './services/emailService.j
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { v2 as cloudinary } from 'cloudinary';
 
 // Add this for ES modules __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config();
-
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-// Cloudinary upload function
-const uploadToCloudinary = (fileBuffer, folder = 'szeconnect') => {
-  return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        folder: folder,
-        resource_type: 'auto'
-      },
-      (error, result) => {
-        if (error) reject(error);
-        else resolve(result);
-      }
-    );
-    
-    const stream = require('stream');
-    const bufferStream = new stream.PassThrough();
-    bufferStream.end(fileBuffer);
-    bufferStream.pipe(uploadStream);
-  });
-};
 
 // Add Multer configuration HERE
 const storage = multer.diskStorage({
@@ -183,9 +154,8 @@ const uploadProfile = multer({
     }
   }
 });
-
 // --------------------
-// REGISTER ENDPOINT WITH CLOUDINARY PROFILE PICTURES
+// REGISTER ENDPOINT WITH CLOUDINARY PROFILE PICTURES - DEBUG VERSION
 // --------------------
 app.post("/register", uploadProfile.single('profileImage'), async (req, res) => {
   try {
@@ -204,7 +174,13 @@ app.post("/register", uploadProfile.single('profileImage'), async (req, res) => 
     } = req.body;
 
     console.log("📝 Registration attempt:", { username, email, neptun });
-    console.log("📸 Profile file:", req.file ? `Uploaded: ${req.file.originalname}` : 'No file');
+    console.log("📸 Profile file details:", req.file ? {
+      originalname: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+      bufferLength: req.file.buffer?.length
+    } : 'No file received');
+    console.log("📦 Request body keys:", Object.keys(req.body));
 
     // === MANDATORY FIELD VALIDATION ===
     const mandatoryFields = { username, neptun, startYear, major, email, password, passwordAgain };
@@ -310,15 +286,31 @@ app.post("/register", uploadProfile.single('profileImage'), async (req, res) => 
     if (req.file) {
       try {
         console.log("☁️ Uploading profile picture to Cloudinary...");
+        console.log("📊 File buffer exists:", !!req.file.buffer);
+        console.log("📊 File buffer length:", req.file.buffer?.length);
+        
         const cloudinaryResult = await uploadToCloudinary(req.file.buffer, 'szeconnect-profiles');
         profileImageUrl = cloudinaryResult.secure_url;
         console.log("✅ Profile picture uploaded to Cloudinary:", profileImageUrl);
+        console.log("📝 Cloudinary result:", {
+          url: cloudinaryResult.secure_url,
+          public_id: cloudinaryResult.public_id,
+          format: cloudinaryResult.format
+        });
       } catch (uploadError) {
         console.error("❌ Cloudinary upload failed:", uploadError);
+        console.error("❌ Cloudinary error details:", {
+          message: uploadError.message,
+          stack: uploadError.stack
+        });
         // Don't fail registration if image upload fails
         console.log("⚠️ Continuing registration without profile picture");
       }
+    } else {
+      console.log("ℹ️ No profile picture file provided");
     }
+
+    console.log("💾 Final profileImageUrl to save:", profileImageUrl);
 
     // === HASH PASSWORD ===
     const hashedPassword = await bcrypt.hash(password, 12);
@@ -326,6 +318,8 @@ app.post("/register", uploadProfile.single('profileImage'), async (req, res) => 
     // === SAVE USER TO DATABASE (POSTGRESQL) ===
     let result;
     try {
+      console.log("💾 Saving user to database with profile_picture_url:", profileImageUrl);
+      
       result = await pool.query(
         `INSERT INTO users 
          (username, neptun_code, fullname, birthdate, gender, email, start_year, major, bio, password_hash, profile_picture_url)
@@ -345,7 +339,12 @@ app.post("/register", uploadProfile.single('profileImage'), async (req, res) => 
         ]
       );
 
-      console.log("✅ Database insert successful! New user:", result.rows[0]);
+      console.log("✅ Database insert successful! New user:", {
+        id: result.rows[0].user_id,
+        username: result.rows[0].username,
+        profile_picture_url: result.rows[0].profile_picture_url
+      });
+
     } catch (insertError) {
       console.error("❌ Database insert error:", insertError);
       console.error("❌ Insert query details:", {
@@ -353,7 +352,8 @@ app.post("/register", uploadProfile.single('profileImage'), async (req, res) => 
         email: normalizedEmail,
         neptun: normalizedNeptun,
         startYear: parseInt(startYear),
-        major: normalizedMajor
+        major: normalizedMajor,
+        profileImageUrl: profileImageUrl
       });
       return res.status(500).json({ 
         success: false,
@@ -378,6 +378,12 @@ app.post("/register", uploadProfile.single('profileImage'), async (req, res) => 
       birthYear: result.rows[0].birthdate ? new Date(result.rows[0].birthdate).getFullYear() : null,
       createdAt: result.rows[0].created_at || new Date().toISOString()
     };
+
+    console.log("🎉 Final user object:", {
+      id: newUser.id,
+      username: newUser.username,
+      profileImage: newUser.profileImage
+    });
 
     // ========================
     // 🎉 EMAIL INTEGRATION
@@ -419,6 +425,7 @@ app.post("/register", uploadProfile.single('profileImage'), async (req, res) => 
 
   } catch (error) {
     console.error("❌ Unexpected registration error:", error);
+    console.error("❌ Error stack:", error.stack);
     res.status(500).json({ 
       success: false,
       message: "Internal server error during registration",
@@ -527,7 +534,6 @@ app.get("/profile", async (req, res) => {
         bio: user.bio,
         gender: user.gender,
         birthdate: user.birthdate,
-        profileImage: user.profile_picture_url,
         createdAt: user.created_at
       }
     });
@@ -549,7 +555,7 @@ app.get("/profile", async (req, res) => {
 app.get("/users", async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT user_id, username, email, neptun_code, major, start_year, profile_picture_url FROM users ORDER BY user_id'
+      'SELECT user_id, username, email, neptun_code, major, start_year FROM users ORDER BY user_id'
     );
     
     res.json({
@@ -560,8 +566,7 @@ app.get("/users", async (req, res) => {
         email: u.email,
         neptun: u.neptun_code,
         major: u.major,
-        startYear: u.start_year,
-        profileImage: u.profile_picture_url
+        startYear: u.start_year
       }))
     });
   } catch (error) {
@@ -575,6 +580,7 @@ app.get("/users", async (req, res) => {
 // --------------------
 
 // Get all available groups from database
+// Get all available groups from database - UPDATED WITH MEMBER COUNTS
 app.get("/groups", async (req, res) => {
   try {
     const { category, major, search } = req.query;
@@ -612,7 +618,7 @@ app.get("/groups", async (req, res) => {
         name: g.group_name,
         description: g.description,
         creator: g.creator_name,
-        memberCount: parseInt(g.member_count) || 0,
+        memberCount: parseInt(g.member_count) || 0, // ADD THIS LINE
         createdAt: g.created_at
       }))
     });
@@ -873,7 +879,6 @@ app.get("/user/groups", async (req, res) => {
     });
   }
 });
-
 // Check if user is following a group
 app.get("/groups/:groupId/following", async (req, res) => {
   try {
@@ -1275,7 +1280,6 @@ app.post("/posts", authenticateToken, upload.array('images', 5), async (req, res
     });
   }
 });
-
 // --------------------
 // LIKES ENDPOINTS (UPDATED FOR post_likes TABLE)
 // --------------------
@@ -1520,8 +1524,7 @@ app.get("/search/users", async (req, res) => {
         neptun_code,
         major,
         start_year,
-        fullname,
-        profile_picture_url
+        fullname
       FROM users 
       WHERE username ILIKE $1 
          OR email ILIKE $1 
@@ -1539,8 +1542,7 @@ app.get("/search/users", async (req, res) => {
         neptun: u.neptun_code,
         major: u.major,
         startYear: u.start_year,
-        fullName: u.fullname,
-        profileImage: u.profile_picture_url
+        fullName: u.fullname
       }))
     });
 
@@ -1552,7 +1554,6 @@ app.get("/search/users", async (req, res) => {
     });
   }
 });
-
 // --------------------
 // DEV UTILITY ENDPOINTS
 // --------------------
