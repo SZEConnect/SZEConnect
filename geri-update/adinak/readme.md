@@ -1,1 +1,0 @@
-helyes layout
