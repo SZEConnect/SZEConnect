@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { api } from "../lib/api";
 
 export default function GroupPage() {
   const { groupId } = useParams();
@@ -12,11 +13,9 @@ export default function GroupPage() {
   const [hovering, setHovering] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showCreateMenu, setShowCreateMenu] = useState(false);
-
-
-
-
-  const handleJoinToggle = () => setJoined(!joined);
+  const [token] = useState(localStorage.getItem('token'));
+  const [sortBy, setSortBy] = useState("date"); // "date" or "popularity"
+  const [postsWithLikes, setPostsWithLikes] = useState([]);
 
   const t = useMemo(() => {
     const hu = {
@@ -27,8 +26,8 @@ export default function GroupPage() {
       createPost: "Új bejegyzés",
       newGroup: "Új csoport",
       postsTitle: "Bejegyzések",
-      sortPopularity: "Popularitás szerint csökkenő",
-      sortDate: "Bejegyzés dátuma szerint csökkenő",
+      sortPopularity: "Legnépszerűbb elöl",
+      sortDate: "Legfrissebb elöl",
       join: "Csatlakozás a csoporthoz",
       leave: "Kilépés a csoportból",
       logout: "Kijelentkezés",
@@ -36,6 +35,12 @@ export default function GroupPage() {
       profile: "Profil",
       back: "Vissza",
       noPosts: "Még nincs bejegyzés.",
+      loading: "Betöltés...",
+      error: "Hiba a csoport betöltésekor",
+      joinSuccess: "Sikeresen csatlakoztál a csoporthoz!",
+      leaveSuccess: "Sikeresen elhagytad a csoportot!",
+      joinError: "Hiba a csatlakozáskor",
+      leaveError: "Hiba a kilépéskor",
     };
 
     const en = {
@@ -55,130 +60,293 @@ export default function GroupPage() {
       profile: "Profile",
       back: "Back",
       noPosts: "No posts yet.",
+      loading: "Loading...",
+      error: "Error loading group",
+      joinSuccess: "Successfully joined the group!",
+      leaveSuccess: "Successfully left the group!",
+      joinError: "Error joining group",
+      leaveError: "Error leaving group",
     };
 
     return lang === "hu" ? hu : en;
   }, [lang]);
 
+  // Fetch group data and posts
   useEffect(() => {
-    setLoading(true);
-    setTimeout(() => {
-      setGroup(MOCK_GROUP);
-      setPosts(MOCK_GROUP_POSTS);
-      setLoading(false);
-    }, 300);
-  }, [groupId]);
+    const fetchGroupData = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch specific group details
+        const groupResponse = await fetch(`https://szeconnect.onrender.com/groups/${groupId}`);
+        const groupData = await groupResponse.json();
+        
+        if (groupData.success && groupData.group) {
+          const foundGroup = groupData.group;
+          setGroup(foundGroup);
+          
+          // Fetch all posts and filter by this group
+          const postsResponse = await api.listPosts();
+          const groupPosts = postsResponse.posts.filter(post => post.groupId === parseInt(groupId));
+          setPosts(groupPosts);
+          
+          // Check if user is already following this group
+          if (token) {
+            try {
+              console.log("🔄 Checking follow status for group:", foundGroup.id);
+              const followResponse = await api.checkFollowing(foundGroup.id, token);
+              console.log("📡 Follow API response:", followResponse);
+              
+              if (followResponse.success) {
+                console.log("✅ Setting joined to:", followResponse.following);
+                setJoined(followResponse.following);
+              } else {
+                console.log("❌ Follow check failed");
+                setJoined(false);
+              }
+            } catch (followError) {
+              console.error("🚨 Failed to check follow status:", followError);
+              setJoined(false);
+            }
+          } else {
+            console.log("🔒 No token, user is not following");
+            setJoined(false);
+          }
+        } else {
+          console.log("❌ Group not found or API error");
+        }
+        
+      } catch (error) {
+        console.error("Failed to fetch group data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const onCreatePost = () => navigate("/post/new");
+    fetchGroupData();
+  }, [groupId, token]);
+
+  // Fetch likes for posts
+  useEffect(() => {
+    const fetchLikesForPosts = async () => {
+      if (!posts.length) {
+        setPostsWithLikes([]);
+        return;
+      }
+
+      try {
+        const postsWithLikeData = await Promise.all(
+          posts.map(async (post) => {
+            try {
+              const likesData = await api.getLikes(post.id);
+              return {
+                ...post,
+                likes: likesData.likes
+              };
+            } catch (error) {
+              console.error(`Failed to fetch likes for post ${post.id}:`, error);
+              return {
+                ...post,
+                likes: { up: 0, down: 0, my: 0, net: 0 }
+              };
+            }
+          })
+        );
+        
+        setPostsWithLikes(postsWithLikeData);
+      } catch (error) {
+        console.error("Error fetching likes for posts:", error);
+        setPostsWithLikes(posts); // Fallback to posts without likes
+      }
+    };
+
+    fetchLikesForPosts();
+  }, [posts]);
+
+  // Create sorted posts based on the current sort method
+  const sortedPosts = useMemo(() => {
+    if (!postsWithLikes.length) return postsWithLikes;
+    
+    const postsCopy = [...postsWithLikes];
+    
+    switch (sortBy) {
+      case "popularity":
+        // Sort by net likes (upvotes - downvotes) in descending order
+        return postsCopy.sort((a, b) => {
+          const aNetLikes = (a.likes?.up || 0) - (a.likes?.down || 0);
+          const bNetLikes = (b.likes?.up || 0) - (b.likes?.down || 0);
+          return bNetLikes - aNetLikes; // Highest popularity first
+        });
+      
+      case "date":
+      default:
+        // Sort by date (newest first)
+        return postsCopy.sort((a, b) => new Date(b.time) - new Date(a.time));
+    }
+  }, [postsWithLikes, sortBy]);
+
+  const handleJoinToggle = async () => {
+    console.log("🖱️ Follow button clicked!");
+    console.log("🔄 Current joined state:", joined);
+    console.log("🔑 Token exists:", !!token);
+    console.log("📝 Group ID:", groupId);
+
+    if (!token) {
+      alert(lang === "hu" ? "Bejelentkezés szükséges" : "Login required");
+      return;
+    }
+
+    try {
+      if (joined) {
+        console.log("➖ UNFOLLOWING group:", groupId);
+        const response = await api.leaveGroup(groupId, token);
+        console.log("📡 Unfollow API response:", response);
+        
+        if (response.success) {
+          setJoined(false);
+          console.log("✅ Successfully unfollowed, state updated to: false");
+          // Update the group data to reflect the change
+          setGroup(prev => prev ? { ...prev, memberCount: (prev.memberCount || 1) - 1 } : null);
+        } else {
+          console.log("❌ Unfollow API returned success: false");
+        }
+      } else {
+        console.log("➕ FOLLOWING group:", groupId);
+        const response = await api.joinGroup(groupId, token);
+        console.log("📡 Follow API response:", response);
+        
+        if (response.success) {
+          setJoined(true);
+          console.log("✅ Successfully followed, state updated to: true");
+          // Update the group data to reflect the change
+          setGroup(prev => prev ? { ...prev, memberCount: (prev.memberCount || 0) + 1 } : null);
+        } else {
+          console.log("❌ Follow API returned success: false");
+        }
+      }
+    } catch (error) {
+      console.error("🚨 API call failed:", error);
+      alert(joined ? t.leaveError : t.joinError);
+    }
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString(lang === "hu" ? "hu-HU" : "en-US", {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
   if (loading) return <Skeleton />;
-  if (!group) return <div className="p-6">Group not found.</div>;
+  if (!group) return <div className="p-6">{lang === "hu" ? "Csoport nem található" : "Group not found"}</div>;
 
   return (
     <div className="min-h-screen bg-[#FDFDFE] flex flex-col">
-    {/* HEADER */}
-    <header className="flex items-center justify-between px-4 sm:px-6 md:px-10 py-4 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
-      {/* Logo + Brand (always visible) */}
-      <button
-        onClick={() => navigate("/home")}
-        className="flex items-center gap-2 sm:gap-3 focus:outline-none hover:opacity-90 transition"
-        title="Go to Home"
-      >
-        <LogoShare className="w-8 h-8 sm:w-10 sm:h-10" />
-        <span className="text-xl sm:text-2xl font-bold whitespace-nowrap">{t.brand}</span>
-      </button>
-
-      {/* Desktop buttons */}
-      <div className="hidden md:flex items-center gap-4">
+      {/* HEADER */}
+      <header className="flex items-center justify-between px-4 sm:px-6 md:px-10 py-4 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
+        {/* Logo + Brand */}
         <button
-          onClick={() => setLang(lang === "hu" ? "en" : "hu")}
-          className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
+          onClick={() => navigate("/home")}
+          className="flex items-center gap-2 sm:gap-3 focus:outline-none hover:opacity-90 transition"
+          title="Go to Home"
         >
-          {lang === "hu" ? "EN" : "HU"}
+          <LogoShare className="w-8 h-8 sm:w-10 sm:h-10" />
+          <span className="text-xl sm:text-2xl font-bold whitespace-nowrap">{t.brand}</span>
         </button>
 
-        <button
-          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
-          title={t.info}
-          onClick={() => navigate("/info")}
-        >
-          i
-        </button>
+        {/* Desktop buttons */}
+        <div className="hidden md:flex items-center gap-4">
+          <button
+            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+            className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
+          >
+            {lang === "hu" ? "EN" : "HU"}
+          </button>
 
-        <button
-          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
-          title={t.profile}
-          onClick={() => navigate("/profile")}
-        >
-          👤
-        </button>
+          <button
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
+            title={t.info}
+            onClick={() => navigate("/info")}
+          >
+            i
+          </button>
 
-        <button
-          className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
-          onClick={() => navigate("/login")}
-        >
-          {t.logout}
-        </button>
-      </div>
+          <button
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
+            title={t.profile}
+            onClick={() => navigate("/profile")}
+          >
+            👤
+          </button>
 
-      {/* Mobile Hamburger */}
-      <div className="md:hidden relative">
-        <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="w-10 h-10 rounded-md bg-[#E1860E] text-white text-2xl font-bold flex items-center justify-center shadow hover:opacity-90"
-          aria-label="Toggle menu"
-        >
-          {menuOpen ? "×" : "☰"}
-        </button>
+          <button
+            className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
+            onClick={() => navigate("/login")}
+          >
+            {t.logout}
+          </button>
+        </div>
 
-        {/* Dropdown */}
-        {menuOpen && (
-          <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
-            <button
-              onClick={() => {
-                setLang(lang === "hu" ? "en" : "hu");
-                setMenuOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
-            >
-              🌐 {lang === "hu" ? "EN" : "HU"}
-            </button>
+        {/* Mobile Hamburger */}
+        <div className="md:hidden relative">
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="w-10 h-10 rounded-md bg-[#E1860E] text-white text-2xl font-bold flex items-center justify-center shadow hover:opacity-90"
+            aria-label="Toggle menu"
+          >
+            {menuOpen ? "×" : "☰"}
+          </button>
 
-            <button
-              onClick={() => {
-                navigate("/info");
-                setMenuOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
-            >
-              ℹ️ {t.info}
-            </button>
+          {/* Dropdown */}
+          {menuOpen && (
+            <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
+              <button
+                onClick={() => {
+                  setLang(lang === "hu" ? "en" : "hu");
+                  setMenuOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+              >
+                🌐 {lang === "hu" ? "EN" : "HU"}
+              </button>
 
-            <button
-              onClick={() => {
-                navigate("/profile");
-                setMenuOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
-            >
-              👤 {t.profile}
-            </button>
+              <button
+                onClick={() => {
+                  navigate("/info");
+                  setMenuOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+              >
+                ℹ️ {t.info}
+              </button>
 
-            <button
-              onClick={() => {
-                navigate("/login");
-                setMenuOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 font-semibold text-[#E1860E] hover:bg-[#EDF5FA]"
-            >
-              🚪 {t.logout}
-            </button>
-          </div>
-        )}
-      </div>
-    </header>
+              <button
+                onClick={() => {
+                  navigate("/profile");
+                  setMenuOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+              >
+                👤 {t.profile}
+              </button>
 
-
+              <button
+                onClick={() => {
+                  navigate("/login");
+                  setMenuOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 font-semibold text-[#E1860E] hover:bg-[#EDF5FA]"
+              >
+                🚪 {t.logout}
+              </button>
+            </div>
+          )}
+        </div>
+      </header>
 
       {/* MAIN CONTENT */}
       <main className="flex-1 px-4 sm:px-6 md:px-10 py-6 md:py-8 space-y-6 md:space-y-8">
@@ -187,11 +355,7 @@ export default function GroupPage() {
           {/* Left: avatar + name + stats */}
           <div className="flex items-start gap-4 md:items-center md:gap-6">
             <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full bg-[#EDF5FA] border border-[#1F3351]/20 flex items-center justify-center overflow-hidden shrink-0">
-              {group.avatarUrl ? (
-                <img src={group.avatarUrl} alt="group" className="w-full h-full object-cover" />
-              ) : (
-                <GroupIcon className="w-8 h-8 sm:w-10 sm:h-10" stroke="#1F3351" />
-              )}
+              <GroupIcon className="w-8 h-8 sm:w-10 sm:h-10" stroke="#1F3351" />
             </div>
 
             <div className="min-w-0">
@@ -202,7 +366,7 @@ export default function GroupPage() {
               {/* Stats: stacked on mobile, inline on md+ */}
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 md:flex md:flex-wrap md:gap-4">
                 <div className="rounded-xl border border-[#1F3351]/20 bg-[#EDF5FA] px-4 py-2 text-[#1F3351] font-medium">
-                  {t.members}: {group.members}
+                  {t.members}: {group.memberCount || 0}
                 </div>
                 <div className="rounded-xl border border-[#1F3351]/20 bg-[#EDF5FA] px-4 py-2 text-[#1F3351] font-medium">
                   {t.posts}: {posts.length}
@@ -217,7 +381,9 @@ export default function GroupPage() {
             onMouseEnter={() => joined && setHovering(true)}
             onMouseLeave={() => setHovering(false)}
             className={`w-full sm:w-auto text-center rounded-lg px-6 py-2 font-semibold shadow transition
-              ${joined ? "bg-[#6C8EBF] text-white hover:bg-[#5A7BA5]" : "bg-[#E1860E] text-white hover:bg-[#cf760c]"}`}
+              ${joined ? "bg-[#6C8EBF] text-white hover:bg-[#5A7BA5]" : "bg-[#E1860E] text-white hover:bg-[#cf760c]"}
+              ${!token ? "opacity-50 cursor-not-allowed" : ""}`}
+            disabled={!token}
           >
             {joined
               ? (hovering ? (lang === "hu" ? "Kilépés" : "Leave") : (lang === "hu" ? "Követve" : "Following"))
@@ -225,15 +391,12 @@ export default function GroupPage() {
           </button>
         </div>
 
-
         {/* Group Description */}
         <section className="pt-4">
-
           <p className="text-[#1F3351] leading-relaxed whitespace-pre-wrap">
-            {group.bio || "—"}
+            {group.description || (lang === "hu" ? "Nincs leírás" : "No description")}
           </p>
         </section>
-
 
         {/* Post controls */}
         <section className="flex flex-wrap items-center justify-between gap-4">
@@ -242,47 +405,54 @@ export default function GroupPage() {
           </h2>
 
           <div className="flex flex-wrap items-center gap-3">
-            <button className="rounded-lg bg-[#6C8EBF] text-white px-4 py-2 text-sm font-semibold shadow hover:opacity-90">
+            <button 
+              onClick={() => setSortBy("popularity")}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold shadow hover:opacity-90 ${
+                sortBy === "popularity" 
+                  ? "bg-[#E1860E] text-white" 
+                  : "bg-[#6C8EBF] text-white"
+              }`}
+            >
               {t.sortPopularity}
             </button>
-            <button className="rounded-lg bg-[#6C8EBF] text-white px-4 py-2 text-sm font-semibold shadow hover:opacity-90">
+            <button 
+              onClick={() => setSortBy("date")}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold shadow hover:opacity-90 ${
+                sortBy === "date" 
+                  ? "bg-[#E1860E] text-white" 
+                  : "bg-[#6C8EBF] text-white"
+              }`}
+            >
               {t.sortDate}
             </button>
 
             <button
-              onClick={() => alert("Group report sent (mock)")}
+              onClick={() => alert(lang === "hu" ? "Csoport jelentve" : "Group reported")}
               className="rounded-lg bg-[#6C8EBF] text-white px-4 py-2 text-sm font-semibold shadow hover:opacity-90"
             >
               {lang === "hu" ? "Csoport jelentése" : "Report Group"}
             </button>
 
+            {/* Edit Group button - only show if user is creator/admin */}
             <button
               onClick={() => navigate(`/groups/${groupId}/edit`)}
               className="rounded-lg bg-[#E1860E] text-white px-4 py-2 text-sm font-semibold shadow hover:opacity-90"
             >
               {lang === "hu" ? "Csoport szerkesztése" : "Edit Group"}
             </button>
-
-
-            {/* <button
-              onClick={onCreatePost}
-              className="rounded-lg bg-[#E1860E] text-white px-5 py-2 font-semibold shadow hover:opacity-90"
-            >
-              {t.createPost}
-            </button> */}
           </div>
         </section>
 
-        {/* POSTS – same design as HomePage */}
+        {/* POSTS */}
         <section className="flex-1 space-y-6 pb-12">
-          {posts.length === 0 ? (
+          {sortedPosts.length === 0 ? (
             <div className="rounded-xl border border-dashed border-[#1F3351]/30 bg-white px-4 py-10 text-center text-[#1F3351]/70">
-              {lang === "hu" ? "Még nincs bejegyzés." : "No posts yet."}
+              {t.noPosts}
             </div>
           ) : (
-            posts.map((p) => (
+            sortedPosts.map((post) => (
               <article
-                key={p.id}
+                key={post.id}
                 className="w-full rounded-2xl bg-[#EDF5FA] border border-[#1F3351]/20 shadow-sm hover:shadow-md transition p-6"
               >
                 <header className="flex items-center gap-4 mb-3">
@@ -294,60 +464,61 @@ export default function GroupPage() {
                     <div className="flex items-center justify-between">
                       <div className="truncate">
                         <Link
-                          to={`/users/${p.userId || "usr-demo"}`}
+                          to={`/users/${post.userId}`}
                           className="font-bold text-[#1F3351] hover:underline hover:text-[#E1860E] transition"
                         >
-                          {p.authorName || p.author || "Unknown User"}
+                          {post.authorName}
                         </Link>
 
                         <span className="ml-2 text-sm text-[#1F3351]/70">
-                          {p.createdAt || "2025-10-01 12:15"}
+                          {formatDate(post.time)}
                         </span>
                       </div>
 
-                      {p.group && (
+                      {post.group && (
                         <button
-                          onClick={() => navigate(`/groups/${p.groupId || "grp-demo"}`)}
+                          onClick={() => navigate(`/groups/${post.groupId}`)}
                           className="text-[#E1860E] font-semibold hover:underline ml-4 shrink-0"
                         >
-                          {p.group}
+                          {post.group}
                         </button>
                       )}
+                    </div>
+                    
+                    {/* Display popularity stats */}
+                    <div className="text-sm text-[#1F3351]/70 mt-1">
+                      <span className="flex items-center gap-4">
+                        <span>👍 {post.likes?.up || 0}</span>
+                        <span>👎 {post.likes?.down || 0}</span>
+                      </span>
                     </div>
                   </div>
                 </header>
 
-
                 <button
-                  onClick={() => navigate(`/posts/${p.id}`)}
+                  onClick={() => navigate(`/posts/${post.id}`)}
                   className="text-left w-full"
                 >
                   <h2 className="text-lg font-extrabold text-[#1F3351] mb-2">
-                    {p.title}
+                    {post.title}
                   </h2>
-                  <p className="text-[#1F3351]/90">{p.content}</p>
+                  <p className="text-[#1F3351]/90">{post.content}</p>
                 </button>
-                {/* <button
-                  onClick={() => alert("Report sent (mock)") }
-                  className="mt-3 text-sm text-red-600 hover:underline font-semibold"
-                >
-                  {lang === "hu" ? "Jelentés" : "Report"}
-                </button> */}
-
               </article>
             ))
           )}
         </section>
+
         {/* FLOATING CREATE BUTTON */}
         <div className="fixed bottom-8 right-10 flex flex-col items-end space-y-3">
           {showCreateMenu && (
             <>
               <button
-              onClick={() => navigate("/groups/new")}
-              className="w-44 flex items-center justify-between rounded-full bg-[#E1860E] text-white px-6 py-2 text-sm font-semibold shadow-lg hover:opacity-95 transition-transform"
-            >
-              <span>{t.newGroup}</span>
-            </button>
+                onClick={() => navigate("/groups/new")}
+                className="w-44 flex items-center justify-between rounded-full bg-[#E1860E] text-white px-6 py-2 text-sm font-semibold shadow-lg hover:opacity-95 transition-transform"
+              >
+                <span>{t.newGroup}</span>
+              </button>
               <button
                 onClick={() => navigate("/post/new")}
                 className="w-44 flex items-center justify-between rounded-full bg-[#E1860E] text-white px-6 py-2 text-sm font-semibold shadow-lg hover:opacity-95 transition-transform"
@@ -389,8 +560,6 @@ export default function GroupPage() {
             )}
           </button>
         </div>
-
-
       </main>
     </div>
   );
@@ -467,17 +636,3 @@ function GroupIcon({ className = "", stroke = "#1F3351" }) {
     </svg>
   );
 }
-
-/* Mock Data */
-const MOCK_GROUP = {
-  id: "grp-1",
-  name: "Informatics Students",
-  bio: "Ez egy minta csoport leírás. Itt jelennek meg a csoport céljai és szabályai.",
-  members: 87,
-  avatarUrl: "",
-};
-
-const MOCK_GROUP_POSTS = [
-  { id: "gp1", author: "Kiss Máté", createdAt: "2025-09-27", title: "Új félév indulása", content: "Üdv mindenkinek az új félévben!" },
-  { id: "gp2", author: "Nagy Anna", createdAt: "2025-09-25", title: "Vizsgák", content: "A vizsgaidőpontokat feltöltöttük a Neptunra." },
-];

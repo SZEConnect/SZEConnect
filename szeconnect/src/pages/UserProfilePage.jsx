@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-
+import { api } from "../lib/api";
 
 const PROGRAM_LIST = (lang) => {
     const hu = [
@@ -135,7 +135,7 @@ const PROGRAM_LIST = (lang) => {
         "Health Care Manager MSc","Obstetrics and Gynecology Sonography MSc","Health Psychology MSc","Nutrition Science MSc","Midwifery MSc",
       ]},
       { group: "Master – IT", options: ["Business Informatics MSc","Computer Engineering MSc","Software Engineering MSc"] },
-      { group: "Master – Humanities", options: ["Human Resource Counselling MA","Children’s Culture MA","Cultural Mediation MA"] },
+      { group: "Master – Humanities", options: ["Human Resource Counselling MA","Children's Culture MA","Cultural Mediation MA"] },
       { group: "Master – Engineering", options: [
         "ESG – Environmental, Social and Governance Specialist MSc","Architecture MSc","Mechanical Engineering MSc",
         "Infrastructure Civil Engineering MSc","Vehicle Engineering MSc","Transport Engineering MSc","Logistics Engineering MSc",
@@ -164,7 +164,7 @@ const PROGRAM_LIST = (lang) => {
       { group: "Undivided – Education", options: ["Teacher (Engineering Teacher)","Teacher (Music Teacher)"] },
     ];
     return lang === "hu" ? hu : en;
-  };
+};
 
 export default function UserProfilePage() {
   const { userId } = useParams();
@@ -178,56 +178,117 @@ export default function UserProfilePage() {
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // PROGRAM LIST (same as RegisterPage)
+  const programs = useMemo(() => PROGRAM_LIST(lang), [lang]);
 
-// PROGRAM LIST (same as RegisterPage)
-const programs = useMemo(() => PROGRAM_LIST(lang), [lang]);
-
-
+  // Get current user ID from localStorage (set this after login)
+  const currentUserId = localStorage.getItem("userId");
+  const isOwnProfile = !userId || userId === currentUserId;
+  const profileUserId = userId || currentUserId;
 
   useEffect(() => {
-    setLoading(true);
+    const fetchUserProfile = async () => {
+      setLoading(true);
+      try {
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+          console.log("❌ No token available - user not logged in");
+          setLoading(false);
+          return;
+        }
 
-    // Simulated fetch (mock fallback)
-    setTimeout(() => {
-      // Use MOCK_USER until backend is available
-      const u = MOCK_USER;
+        console.log("🔍 Token available, fetching profile...");
 
-      // Normalize structure (same as future backend version)
-      const normalized = u
-        ? {
-            id: u.id,
-            firstName: u.firstName || "",
-            lastName: u.lastName || "",
-            username: u.username || "",
-            email: u.email || "",
-            neptun: u.neptun || "",
-            startYear: u.startYear || "",
-            program: u.program || "",
-            birthYear: u.birthYear || "",
-            gender: u.gender || "",
-            bio: u.bio || "",
-            avatarUrl: u.avatarUrl || "",
-            name: u.name || "",
+        // If we have a specific user ID from URL, use that endpoint
+        if (userId) {
+          console.log("📝 Fetching specific user:", userId);
+          const response = await fetch(`https://szeconnect.onrender.com/users/${userId}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            if (result.success) {
+              const userData = result.user;
+              
+              // ✅ SIMPLIFIED NORMALIZATION - Use fullname only
+              const normalizedUser = {
+                id: userData.user_id || userData.id,
+                username: userData.username || "",
+                email: userData.email || "",
+                neptun: userData.neptun_code || userData.neptun || "",
+                startYear: userData.start_year || userData.startYear || "",
+                program: userData.major || userData.program || "",
+                birthYear: userData.birthdate ? new Date(userData.birthdate).getFullYear() : userData.birthYear || "",
+                gender: userData.gender || "",
+                bio: userData.bio || "",
+                avatarUrl: userData.profileImage || userData.profile_picture_url || userData.avatarUrl || "",
+                fullName: userData.fullname || userData.fullName || "" // Use fullname only
+              };
+              
+              console.log("🎉 Normalized user data:", normalizedUser);
+              
+              setUser(normalizedUser);
+              setEditableUser(normalizedUser);
+              return;
+            }
           }
-        : null;
+        }
+        
+        // If no specific user ID or user not found, get current user's profile
+        console.log("👤 Fetching current user profile");
+        const response = await fetch('https://szeconnect.onrender.com/profile', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          const userData = result.user;
+          console.log("🔍 Raw profile data from /profile:", userData);
+          
+          // ✅ SIMPLIFIED NORMALIZATION - Use fullname only
+          const normalizedUser = {
+            id: userData.user_id || userData.id,
+            username: userData.username || "",
+            email: userData.email || "",
+            neptun: userData.neptun || userData.neptun_code || "",
+            startYear: userData.startYear || userData.start_year || "",
+            program: userData.major || userData.program || "",
+            birthYear: userData.birthdate ? new Date(userData.birthdate).getFullYear() : userData.birthYear || "",
+            gender: userData.gender || "",
+            bio: userData.bio || "",
+            avatarUrl: userData.profile_picture_url || userData.profileImage || userData.avatarUrl || "",
+            fullName: userData.fullName || userData.fullname || "" // Use fullname only
+          };
+          
+          setUser(normalizedUser);
+          setEditableUser(normalizedUser);
+        } else {
+          throw new Error(`Failed to fetch profile: ${response.status}`);
+        }
+        
+      } catch (error) {
+        console.error("❌ Error fetching profile:", error);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      setUser(normalized);
-      setEditableUser(normalized);
-      setPosts(MOCK_POSTS);
-      setLoading(false);
-    }, 300);
-  }, [userId]);
-
-const currentUserId = localStorage.getItem("userId"); // set this after login/register
-const isOwnProfile = !userId || userId === currentUserId;
-
-
+    fetchUserProfile();
+  }, [profileUserId, userId]);
 
   const t = useMemo(() => {
     const hu = {
       brand: "SzeConnect",
-      firstName: "Keresztnév",
-      lastName: "Vezetéknév",
+      fullName: "Teljes név",
       username: "Felhasználónév",
       email: "Email",
       neptun: "Neptun kód",
@@ -245,12 +306,12 @@ const isOwnProfile = !userId || userId === currentUserId;
       postCount: "Bejegyzések száma",
       createPost: "Új bejegyzés",
       newGroup: "Új csoport",
+      postsTitle: "Bejegyzések"
     };
 
     const en = {
       brand: "SzeConnect",
-      firstName: "First Name",
-      lastName: "Last Name",
+      fullName: "Full Name",
       username: "Username",
       email: "Email",
       neptun: "Neptun Code",
@@ -266,10 +327,10 @@ const isOwnProfile = !userId || userId === currentUserId;
       info: "Information",
       profile: "Profile",
       postCount: "Number of posts",
-      createPost: "Új bejegyzés",
-      newGroup: "Új csoport",
+      createPost: "Create post",
+      newGroup: "New group",
+      postsTitle: "Posts"
     };
-
 
     return lang === "hu" ? hu : en;
   }, [lang]);
@@ -280,108 +341,106 @@ const isOwnProfile = !userId || userId === currentUserId;
   return (
     <div className="min-h-screen bg-[#FDFDFE] flex flex-col">
       {/* HEADER */}
-    <header className="flex items-center justify-between px-4 sm:px-6 md:px-10 py-4 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
-      {/* Logo + Brand (always visible) */}
-      <button
-        onClick={() => navigate("/home")}
-        className="flex items-center gap-2 sm:gap-3 focus:outline-none hover:opacity-90 transition"
-        title="Go to Home"
-      >
-        <LogoShare className="w-8 h-8 sm:w-10 sm:h-10" />
-        <span className="text-xl sm:text-2xl font-bold whitespace-nowrap">{t.brand}</span>
-      </button>
-
-      {/* Desktop buttons */}
-      <div className="hidden md:flex items-center gap-4">
+      <header className="flex items-center justify-between px-4 sm:px-6 md:px-10 py-4 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
+        {/* Logo + Brand (always visible) */}
         <button
-          onClick={() => setLang(lang === "hu" ? "en" : "hu")}
-          className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
+          onClick={() => navigate("/home")}
+          className="flex items-center gap-2 sm:gap-3 focus:outline-none hover:opacity-90 transition"
+          title="Go to Home"
         >
-          {lang === "hu" ? "EN" : "HU"}
+          <LogoShare className="w-8 h-8 sm:w-10 sm:h-10" />
+          <span className="text-xl sm:text-2xl font-bold whitespace-nowrap">{t.brand}</span>
         </button>
 
-        <button
-          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
-          title={t.info}
-          onClick={() => navigate("/info")}
-        >
-          i
-        </button>
+        {/* Desktop buttons */}
+        <div className="hidden md:flex items-center gap-4">
+          <button
+            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+            className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
+          >
+            {lang === "hu" ? "EN" : "HU"}
+          </button>
 
-        <button
-          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
-          title={t.profile}
-          onClick={() => navigate("/profile")}
-        >
-          👤
-        </button>
+          <button
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
+            title={t.info}
+            onClick={() => navigate("/info")}
+          >
+            i
+          </button>
 
-        <button
-          className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
-          onClick={() => navigate("/login")}
-        >
-          {t.logout}
-        </button>
-      </div>
+          <button
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
+            title={t.profile}
+            onClick={() => navigate("/profile")}
+          >
+            👤
+          </button>
 
-      {/* Mobile Hamburger */}
-      <div className="md:hidden relative">
-        <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="w-10 h-10 rounded-md bg-[#E1860E] text-white text-2xl font-bold flex items-center justify-center shadow hover:opacity-90"
-          aria-label="Toggle menu"
-        >
-          {menuOpen ? "×" : "☰"}
-        </button>
+          <button
+            className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
+            onClick={() => navigate("/login")}
+          >
+            {t.logout}
+          </button>
+        </div>
 
-        {/* Dropdown */}
-        {menuOpen && (
-          <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
-            <button
-              onClick={() => {
-                setLang(lang === "hu" ? "en" : "hu");
-                setMenuOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
-            >
-              🌐 {lang === "hu" ? "EN" : "HU"}
-            </button>
+        {/* Mobile Hamburger */}
+        <div className="md:hidden relative">
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="w-10 h-10 rounded-md bg-[#E1860E] text-white text-2xl font-bold flex items-center justify-center shadow hover:opacity-90"
+            aria-label="Toggle menu"
+          >
+            {menuOpen ? "×" : "☰"}
+          </button>
 
-            <button
-              onClick={() => {
-                navigate("/info");
-                setMenuOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
-            >
-              ℹ️ {t.info}
-            </button>
+          {/* Dropdown */}
+          {menuOpen && (
+            <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
+              <button
+                onClick={() => {
+                  setLang(lang === "hu" ? "en" : "hu");
+                  setMenuOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+              >
+                🌐 {lang === "hu" ? "EN" : "HU"}
+              </button>
 
-            <button
-              onClick={() => {
-                navigate("/profile");
-                setMenuOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
-            >
-              👤 {t.profile}
-            </button>
+              <button
+                onClick={() => {
+                  navigate("/info");
+                  setMenuOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+              >
+                ℹ️ {t.info}
+              </button>
 
-            <button
-              onClick={() => {
-                navigate("/login");
-                setMenuOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 font-semibold text-[#E1860E] hover:bg-[#EDF5FA]"
-            >
-              🚪 {t.logout}
-            </button>
-          </div>
-        )}
-      </div>
-    </header>
+              <button
+                onClick={() => {
+                  navigate("/profile");
+                  setMenuOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+              >
+                👤 {t.profile}
+              </button>
 
-
+              <button
+                onClick={() => {
+                  navigate("/login");
+                  setMenuOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 font-semibold text-[#E1860E] hover:bg-[#EDF5FA]"
+              >
+                🚪 {t.logout}
+              </button>
+            </div>
+          )}
+        </div>
+      </header>
 
       {/* MAIN CONTENT */}
       <main className="flex-1 px-10 py-8 space-y-8">
@@ -434,7 +493,7 @@ const isOwnProfile = !userId || userId === currentUserId;
                 {editableUser?.username || user.username || "—"}
               </h1>
               <p className="text-[#1F3351]/70 text-sm mt-1">
-                {editableUser?.name || user.name}
+                {editableUser?.fullName || user.fullName || "No name provided"}
               </p>
             </div>
           </div>
@@ -474,7 +533,6 @@ const isOwnProfile = !userId || userId === currentUserId;
           )}
         </div>
 
-
         {/* BIO SECTION */}
         <section>
           <div className="rounded-2xl bg-[#EDF5FA] p-4">
@@ -493,39 +551,23 @@ const isOwnProfile = !userId || userId === currentUserId;
           </div>
         </section>
 
-
         {/* Extended user info – improved layout */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-[#1F3351]">
-          {/* Row 1: First / Last name */}
-          <div>
-            <label className="font-bold block mb-1">{t.firstName}:</label>
+          {/* Full Name - Single Field */}
+          <div className="md:col-span-2">
+            <label className="font-bold block mb-1">{t.fullName}:</label>
             {editMode ? (
               <input
                 type="text"
-                value={editableUser.firstName || ""}
+                value={editableUser.fullName || ""}
                 onChange={(e) =>
-                  setEditableUser({ ...editableUser, firstName: e.target.value })
+                  setEditableUser({ ...editableUser, fullName: e.target.value })
                 }
                 className="w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] text-[#1F3351] placeholder:text-[#1F3351]/70 border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
+                placeholder={lang === "hu" ? "Teljes név" : "Full name"}
               />
             ) : (
-              <span className="font-medium">{user.firstName || "—"}</span>
-            )}
-          </div>
-
-          <div>
-            <label className="font-bold block mb-1">{t.lastName}:</label>
-            {editMode ? (
-              <input
-                type="text"
-                value={editableUser.lastName || ""}
-                onChange={(e) =>
-                  setEditableUser({ ...editableUser, lastName: e.target.value })
-                }
-                className="w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] text-[#1F3351] placeholder:text-[#1F3351]/70 border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
-              />
-            ) : (
-              <span className="font-medium">{user.lastName || "—"}</span>
+              <span className="font-medium">{user.fullName || "—"}</span>
             )}
           </div>
 
@@ -574,7 +616,6 @@ const isOwnProfile = !userId || userId === currentUserId;
             )}
           </div>
 
-
           {/* Dropdown helpers */}
           {(() => {
             const currentYear = new Date().getFullYear();
@@ -599,7 +640,6 @@ const isOwnProfile = !userId || userId === currentUserId;
                   <label className="font-bold block mb-1">{t.birthYear}:</label>
                   <span className="font-medium">{user.birthYear || "—"}</span>
                 </div>
-
 
                 {/* Row 4: Password / Confirm password (only in edit mode) */}
                 {editMode && (
@@ -687,10 +727,6 @@ const isOwnProfile = !userId || userId === currentUserId;
           })()}
         </div>
 
-
-
-
-
         {/* POSTS HEADER */}
         <section className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-[#1F3351]">{t.postsTitle}</h2>
@@ -723,7 +759,7 @@ const isOwnProfile = !userId || userId === currentUserId;
                           to={`/users/${p.userId || "usr-demo"}`}
                           className="font-bold text-[#1F3351] hover:underline hover:text-[#E1860E] transition"
                         >
-                          {p.authorName || user.name}
+                          {p.authorName || user.fullName || user.username}
                         </Link>
 
                         <span className="ml-2 text-sm text-[#1F3351]/70">
@@ -856,18 +892,3 @@ function Skeleton() {
     </div>
   );
 }
-
-const MOCK_USER = {
-  id: "u1",
-  name: "Kiss Máté",
-  program: "Mérnökinformatikus",
-  startYear: "2022",
-  gender: "Férfi",
-  bio: "Szeretek programozni és új technológiákat tanulni.",
-  avatarUrl: "",
-};
-
-const MOCK_POSTS = [
-  { id: "p1", title: "Új projekt a hétvégére", content: "Dolgozunk egy webapp-on a barátaimmal!" },
-  { id: "p2", title: "Tesztek", content: "Ma sikerült lefuttatni az összes egységtesztet!" },
-];

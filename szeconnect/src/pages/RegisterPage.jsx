@@ -374,46 +374,48 @@ export default function RegisterPage() {
     return Object.keys(e).length === 0;
   };
 
-  // ----- Submit -----
+ // ----- Submit -----
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
 
-    // Build payload
-    const payload = {
-      username: form.username.trim(),
-      firstName: form.firstName.trim(),
-      lastName: form.lastName.trim(),
-      fullName: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
-      neptun: form.neptun.toUpperCase(),
-      major: form.major,
-      startYear: Number(form.startYear),
-      birthYear: form.birthYear ? Number(form.birthYear) : undefined,
-      gender: form.gender || undefined,
-      email: form.email.toLowerCase(),
-      password: form.password,
-      passwordAgain: form.confirm,
-      bio: form.bio || undefined,
-      // profile image handling depends on backend; see FormData example below
-    };
+    // 1. Create FormData object
+    const formData = new FormData();
+
+    // 2. Append text fields
+    // Note: We trim strings here just like you did in the payload object
+    formData.append("username", form.username.trim());
+    formData.append("neptun", form.neptun.toUpperCase());
+    formData.append("email", form.email.toLowerCase());
+    formData.append("password", form.password);
+    formData.append("passwordAgain", form.confirm);
+    formData.append("major", form.major);
+    formData.append("startYear", form.startYear);
+    
+    // Combine names for the backend
+    formData.append("fullName", `${form.firstName.trim()} ${form.lastName.trim()}`);
+
+    // Optional fields - only append if they have values
+    if (form.birthYear) formData.append("birthYear", form.birthYear);
+    if (form.gender) formData.append("gender", form.gender);
+    if (form.bio) formData.append("bio", form.bio);
+
+    // 3. Append the File
+    // 'profileImage' must match uploadProfile.single('profileImage') in your backend!
+    if (profileFile) {
+      formData.append("profileImage", profileFile);
+    }
 
     try {
-      // if (profileFile) {
-      //   const fd = new FormData();
-      //   Object.entries(payload).forEach(([k, v]) => {
-      //     if (v !== undefined && v !== null) fd.append(k, String(v));
-      //   });
-      //   fd.append("profileImage", profileFile);
-      //   await api.registerFormData(fd); // implement this in your api client
-      // } else {
-      //   await api.register(payload);
-      // }
-
-      await api.register(payload); // current JSON-based call
+      // 4. Send FormData to API
+      // Ensure your api.register function can handle FormData (see step 2 below)
+      await api.register(formData); 
+      
       alert(lang === "hu" ? "Sikeres regisztráció!" : "Registration successful!");
-      navigate("/interests");
+      navigate("/interests"); // Or wherever you want to redirect
     } catch (err) {
-      alert(err.message);
+      console.error(err);
+      alert(err.message || "Registration failed");
     }
   };
 

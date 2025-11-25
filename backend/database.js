@@ -1,27 +1,35 @@
-import mysql from 'mysql2/promise';
+// database.js
+import pg from 'pg';
+const { Pool } = pg;
 
-const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'root', 
-  password: 'Adibarlang789',
-  database: 'connectdb',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-});
+// Always use Render's internal URL
+const connectionString = process.env.INTERNAL_DATABASE_URL;
 
-// Test connection
-async function testConnection() {
-  try {
-    const connection = await pool.getConnection();
-    console.log('✅ Database connected successfully');
-    connection.release();
-  } catch (error) {
-    console.error('❌ Database connection failed:', error.message);
-  }
+if (!connectionString) {
+  throw new Error("No INTERNAL_DATABASE_URL found in environment variables.");
 }
 
-testConnection();
+// Render internal Postgres requires SSL, but we disable certificate verification
+const pool = new Pool({
+  connectionString,
+  ssl: { rejectUnauthorized: false },
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 15000
+});
 
-// Export the pool
+// Optional: test connection helper
+export const testConnection = async () => {
+  try {
+    const client = await pool.connect();
+    const result = await client.query('SELECT NOW() as now');
+    console.log('✅ Database connected! Current time:', result.rows[0].now);
+    client.release();
+    return true;
+  } catch (err) {
+    console.error('❌ Database connection failed:', err.message);
+    return false;
+  }
+};
+
 export default pool;

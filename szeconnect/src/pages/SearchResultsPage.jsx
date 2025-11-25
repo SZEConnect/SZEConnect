@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-
+import { api } from "../lib/api";
 
 export default function SearchResultsPage() {
   const [lang, setLang] = useState("hu");
@@ -9,9 +9,11 @@ export default function SearchResultsPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showCreateMenu, setShowCreateMenu] = useState(false);
 
-
-
   const [q, setQ] = useState(params.get("q") || "");
+  const [groups, setGroups] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const t = useMemo(() => {
     const hu = {
@@ -26,6 +28,8 @@ export default function SearchResultsPage() {
       logout: "Kijelentkezés",
       createPost: "Új bejegyzés",
       newGroup: "Új csoport",
+      loading: "Betöltés...",
+      members: "tag",
     };
     const en = {
       brand: "SzeConnect",
@@ -39,27 +43,56 @@ export default function SearchResultsPage() {
       logout: "Logout",
       createPost: "New Post",
       newGroup: "New Group",
+      loading: "Loading...",
+      members: "members",
     };
     return lang === "hu" ? hu : en;
   }, [lang]);
 
-  // --- Mock data ---
-  const GROUPS = [
-    { id: "grp-1", name: "HÖK", members: 154, description: "Hallgatói Önkormányzat hírek, események" },
-    { id: "grp-2", name: "ESN SZE", members: 89, description: "Erasmus & international" },
-    { id: "grp-3", name: "Programozás", members: 231, description: "Web, backend, AI" },
-    { id: "grp-4", name: "Foci", members: 120, description: "Heti meccsek és edzések" },
-  ];
+  // Fetch search results
+  useEffect(() => {
+    const fetchSearchResults = async () => {
+      if (!q.trim()) {
+        setGroups([]);
+        setUsers([]);
+        setLoading(false);
+        return;
+      }
 
-  const PROFILES = [
-    { id: "usr-1", name: "Kiss Máté", username: "matek", program: "Mérnökinf. BSc" },
-    { id: "usr-2", name: "Nagy Anna", username: "annuska", program: "Gazdmen BSc" },
-    { id: "usr-3", name: "John Smith", username: "johns", program: "Erasmus" },
-  ];
+      try {
+        setLoading(true);
+        setError(null);
 
-  const filterFn = (text) => text.toLowerCase().includes(q.trim().toLowerCase());
-  const groups = GROUPS.filter(g => [g.name, g.description].some(filterFn));
-  const profiles = PROFILES.filter(p => [p.name, p.username, p.program].some(filterFn));
+        // Fetch both groups and users in parallel
+        const [groupsResponse, usersResponse] = await Promise.all([
+          api.searchGroups(q),
+          api.searchUsers(q)
+        ]);
+
+        if (groupsResponse.success) {
+          setGroups(groupsResponse.groups || []);
+        } else {
+          setGroups([]);
+        }
+
+        if (usersResponse.success) {
+          setUsers(usersResponse.users || []);
+        } else {
+          setUsers([]);
+        }
+
+      } catch (err) {
+        console.error("Search error:", err);
+        setError(err.message);
+        setGroups([]);
+        setUsers([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSearchResults();
+  }, [q]);
 
   const onSubmit = (e) => {
     e.preventDefault();
@@ -70,107 +103,106 @@ export default function SearchResultsPage() {
   return (
     <div className="min-h-screen flex flex-col bg-[#FAFBFD] text-[#1F3351]">
       {/* HEADER */}
- <header className="flex items-center justify-between px-4 sm:px-6 md:px-10 py-4 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
-      {/* Logo + Brand (always visible) */}
-      <button
-        onClick={() => navigate("/home")}
-        className="flex items-center gap-2 sm:gap-3 focus:outline-none hover:opacity-90 transition"
-        title="Go to Home"
-      >
-        <LogoShare className="w-8 h-8 sm:w-10 sm:h-10" />
-        <span className="text-xl sm:text-2xl font-bold whitespace-nowrap">{t.brand}</span>
-      </button>
-
-      {/* Desktop buttons */}
-      <div className="hidden md:flex items-center gap-4">
+      <header className="flex items-center justify-between px-4 sm:px-6 md:px-10 py-4 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
+        {/* Logo + Brand */}
         <button
-          onClick={() => setLang(lang === "hu" ? "en" : "hu")}
-          className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
+          onClick={() => navigate("/home")}
+          className="flex items-center gap-2 sm:gap-3 focus:outline-none hover:opacity-90 transition"
+          title="Go to Home"
         >
-          {lang === "hu" ? "EN" : "HU"}
+          <LogoShare className="w-8 h-8 sm:w-10 sm:h-10" />
+          <span className="text-xl sm:text-2xl font-bold whitespace-nowrap">{t.brand}</span>
         </button>
 
-        <button
-          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
-          title={t.info}
-          onClick={() => navigate("/info")}
-        >
-          i
-        </button>
+        {/* Desktop buttons */}
+        <div className="hidden md:flex items-center gap-4">
+          <button
+            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+            className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
+          >
+            {lang === "hu" ? "EN" : "HU"}
+          </button>
 
-        <button
-          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
-          title={t.profile}
-          onClick={() => navigate("/profile")}
-        >
-          👤
-        </button>
+          <button
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
+            title={t.info}
+            onClick={() => navigate("/info")}
+          >
+            i
+          </button>
 
-        <button
-          className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
-          onClick={() => navigate("/login")}
-        >
-          {t.logout}
-        </button>
-      </div>
+          <button
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
+            title={t.profile}
+            onClick={() => navigate("/profile")}
+          >
+            👤
+          </button>
 
-      {/* Mobile Hamburger */}
-      <div className="md:hidden relative">
-        <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="w-10 h-10 rounded-md bg-[#E1860E] text-white text-2xl font-bold flex items-center justify-center shadow hover:opacity-90"
-          aria-label="Toggle menu"
-        >
-          {menuOpen ? "×" : "☰"}
-        </button>
+          <button
+            className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
+            onClick={() => navigate("/login")}
+          >
+            {t.logout}
+          </button>
+        </div>
 
-        {/* Dropdown */}
-        {menuOpen && (
-          <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
-            <button
-              onClick={() => {
-                setLang(lang === "hu" ? "en" : "hu");
-                setMenuOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
-            >
-              🌐 {lang === "hu" ? "EN" : "HU"}
-            </button>
+        {/* Mobile Hamburger */}
+        <div className="md:hidden relative">
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="w-10 h-10 rounded-md bg-[#E1860E] text-white text-2xl font-bold flex items-center justify-center shadow hover:opacity-90"
+            aria-label="Toggle menu"
+          >
+            {menuOpen ? "×" : "☰"}
+          </button>
 
-            <button
-              onClick={() => {
-                navigate("/info");
-                setMenuOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
-            >
-              ℹ️ {t.info}
-            </button>
+          {/* Dropdown */}
+          {menuOpen && (
+            <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
+              <button
+                onClick={() => {
+                  setLang(lang === "hu" ? "en" : "hu");
+                  setMenuOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+              >
+                🌐 {lang === "hu" ? "EN" : "HU"}
+              </button>
 
-            <button
-              onClick={() => {
-                navigate("/profile");
-                setMenuOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
-            >
-              👤 {t.profile}
-            </button>
+              <button
+                onClick={() => {
+                  navigate("/info");
+                  setMenuOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+              >
+                ℹ️ {t.info}
+              </button>
 
-            <button
-              onClick={() => {
-                navigate("/login");
-                setMenuOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 font-semibold text-[#E1860E] hover:bg-[#EDF5FA]"
-            >
-              🚪 {t.logout}
-            </button>
-          </div>
-        )}
-      </div>
-    </header>
+              <button
+                onClick={() => {
+                  navigate("/profile");
+                  setMenuOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+              >
+                👤 {t.profile}
+              </button>
 
+              <button
+                onClick={() => {
+                  navigate("/login");
+                  setMenuOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 font-semibold text-[#E1860E] hover:bg-[#EDF5FA]"
+              >
+                🚪 {t.logout}
+              </button>
+            </div>
+          )}
+        </div>
+      </header>
 
       {/* CONTENT */}
       <main className="flex-1 px-10 py-12">
@@ -186,67 +218,78 @@ export default function SearchResultsPage() {
               placeholder={t.searchPh}
               className="flex-1 rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] text-[#1F3351] placeholder:text-[#1F3351]/70 border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
             />
-            {/* <button
-              type="submit"
-              className="rounded-xl bg-[#E6A756] text-white font-semibold px-6 py-3 shadow hover:opacity-90"
-            >
-              🔍
-            </button> */}
           </form>
 
-          {/* RESULTS */}
-          <div className="grid md:grid-cols-2 gap-8">
-            {/* GROUPS */}
-            <section>
-              <h2 className="text-2xl font-bold mb-4">{t.groups}</h2>
-              {groups.length > 0 ? (
-                <div className="space-y-4">
-                  {groups.map((g) => (
-                    <ResultCard
-                      key={g.id}
-                      to={`/groups/${g.id}`}
-                      title={g.name}
-                      subtitle={`${g.members} tag`}
-                    >
-                      {g.description}
-                    </ResultCard>
-                  ))}
-                </div>
-              ) : (
-                <EmptyBox text={t.noMatch} />
-              )}
-            </section>
+          {/* LOADING STATE */}
+          {loading && (
+            <div className="flex justify-center items-center py-8">
+              <span className="text-[#1F3351]/60">{t.loading}</span>
+            </div>
+          )}
 
-            {/* PROFILES */}
-            <section>
-              <h2 className="text-2xl font-bold mb-4">{t.profiles}</h2>
-              {profiles.length > 0 ? (
-                <div className="space-y-4">
-                  {profiles.map((p) => (
-                    <ResultCard
-                      key={p.id}
-                      to={`/users/${p.id}`}
-                      title={p.name}
-                      subtitle={`@${p.username} · ${p.program}`}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <EmptyBox text={t.noMatch} />
-              )}
-            </section>
-          </div>
+          {/* ERROR STATE */}
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+              {error}
+            </div>
+          )}
+
+          {/* RESULTS */}
+          {!loading && !error && (
+            <div className="grid md:grid-cols-2 gap-8">
+              {/* GROUPS */}
+              <section>
+                <h2 className="text-2xl font-bold mb-4">{t.groups}</h2>
+                {groups.length > 0 ? (
+                  <div className="space-y-4">
+                    {groups.map((group) => (
+                      <ResultCard
+                        key={group.id}
+                        to={`/groups/${group.id}`}
+                        title={group.name}
+                        subtitle={`${group.memberCount} ${t.members}`}
+                      >
+                        {group.description}
+                      </ResultCard>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyBox text={t.noMatch} />
+                )}
+              </section>
+
+              {/* PROFILES */}
+              <section>
+                <h2 className="text-2xl font-bold mb-4">{t.profiles}</h2>
+                {users.length > 0 ? (
+                  <div className="space-y-4">
+                    {users.map((user) => (
+                      <ResultCard
+                        key={user.id}
+                        to={`/users/${user.id}`}
+                        title={user.fullName || user.username}
+                        subtitle={`@${user.username} · ${user.major || 'No major'}`}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyBox text={t.noMatch} />
+                )}
+              </section>
+            </div>
+          )}
         </div>
-                {/* FLOATING CREATE BUTTON */}
+
+        {/* FLOATING CREATE BUTTON */}
         <div className="fixed bottom-8 right-10 flex flex-col items-end space-y-3">
           {showCreateMenu && (
             <>
               <button
-              onClick={() => navigate("/groups/new")}
-              className="w-44 flex items-center justify-between rounded-full bg-[#E1860E] text-white px-6 py-2 text-sm font-semibold shadow-lg hover:opacity-95 transition-transform"
-            >
-              <span>{t.newGroup}</span>
-            </button>
+                onClick={() => navigate("/groups/new")}
+                className="w-44 flex items-center justify-between rounded-full bg-[#E1860E] text-white px-6 py-2 text-sm font-semibold shadow-lg hover:opacity-95 transition-transform"
+              >
+                <span>{t.newGroup}</span>
+              </button>
               <button
                 onClick={() => navigate("/post/new")}
                 className="w-44 flex items-center justify-between rounded-full bg-[#E1860E] text-white px-6 py-2 text-sm font-semibold shadow-lg hover:opacity-95 transition-transform"
@@ -329,8 +372,8 @@ function LogoShare({ className = "" }) {
       <circle cx="200" cy="200" r="185" fill="none" stroke="#FFFFFF" strokeWidth="30" />
       <line x1="120" y1="206" x2="248" y2="125" stroke="#FFFFFF" strokeWidth="26" strokeLinecap="round" />
       <line x1="120" y1="206" x2="248" y2="279" stroke="#FFFFFF" strokeWidth="26" strokeLinecap="round" />
-      <circle cx="120" cy="206" r="41" fill="#E6A756" stroke="#FFFFFF" strokeWidth="6" />
-      <circle cx="248" cy="125" r="41" fill="#E6A756" stroke="#FFFFFF" strokeWidth="6" />
+      <circle cx="120" cy="206" r="41" fill="#E1860E" stroke="#FFFFFF" strokeWidth="6" />
+      <circle cx="248" cy="125" r="41" fill="#E1860E" stroke="#FFFFFF" strokeWidth="6" />
       <circle cx="248" cy="279" r="41" fill="#2A3F5B" stroke="#FFFFFF" strokeWidth="6" />
     </svg>
   );

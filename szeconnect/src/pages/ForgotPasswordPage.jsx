@@ -110,11 +110,11 @@ export default function ForgotPasswordPage() {
 
           <form
             onSubmit={onSubmit}
-            className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-6"
+            className="grid grid-cols-1 md:grid-cols-1 gap-x-10 gap-y-6"
             noValidate
           >
 
-            {/* Neptun */}
+            {/* Neptun
             <div>
               <label className="block font-semibold text-[#1F3351] mb-2">
                 {t.neptunLabel}
@@ -135,31 +135,36 @@ export default function ForgotPasswordPage() {
               {errors.neptun && (
                 <p className="text-red-600 text-sm mt-1">{errors.neptun}</p>
               )}
-            </div>
+            </div> */}
 
 
             {/* Email */}
-            <div>
-              <label className="block font-semibold text-[#1F3351] mb-2">
+            <div className="w-full flex flex-col items-center">
+              <label className="block font-semibold text-[#1F3351] mb-2 text-center">
                 {t.emailLabel}
               </label>
+
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onBlur={validate}
                 placeholder={t.emailPh}
-                className={`w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] text-[#1F3351] placeholder:text-[#1F3351]/70 ${
-                  errors.email
-                    ? "border-red-500 focus:ring-red-200"
-                    : "border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
-                }`}
+                className={`w-full max-w-md rounded-xl border-2 px-4 py-3 text-base outline-none transition 
+                  focus:ring-4 bg-[#EDF5FA] text-[#1F3351] placeholder:text-[#1F3351]/70 ml-[10px]
+                  ${
+                    errors.email
+                      ? "border-red-500 focus:ring-red-200"
+                      : "border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
+                  }`}
               />
 
               {errors.email && (
                 <p className="text-red-600 text-sm mt-1">{errors.email}</p>
               )}
             </div>
+
+
 
             {/* Submit and Notice */}
             <div className="md:col-span-2 flex flex-col items-center mt-6">
