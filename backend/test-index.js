@@ -1907,14 +1907,7 @@ app.listen(PORT, async () => {
   console.log(`🌐 Server running on port ${PORT}`);
   console.log('='.repeat(60));
   
-  // Test email connection
-  testEmailConnection().then(connected => {
-    if (connected) {
-      console.log(`📧 Email service: READY`);
-    } else {
-      console.log(`❌ Email service: NOT CONFIGURED`);
-    }
-  });
+
 });
 
 // --------------------
