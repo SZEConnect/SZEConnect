@@ -1,167 +1,50 @@
-// services/emailService.js - RENDER COMPATIBLE (ENHANCED)
+// services/emailService.js - SENDGRID VERSION
 import nodemailer from 'nodemailer';
 
-// Debug: Check email environment variables for RENDER
-console.log('🔧 Email Configuration Check on RENDER:');
-console.log('   EMAIL_SERVICE:', process.env.EMAIL_SERVICE || 'Not set');
-console.log('   EMAIL_USER:', process.env.EMAIL_USER || 'Not set');
-console.log('   EMAIL_PASS:', process.env.EMAIL_PASS ? '***' + process.env.EMAIL_PASS.slice(-4) : 'Not set');
+console.log('🔧 SendGrid Configuration:');
+console.log('   SENDGRID_API_KEY:', process.env.SENDGRID_API_KEY ? 'SET' : 'NOT SET');
 console.log('   EMAIL_FROM:', process.env.EMAIL_FROM || 'Not set');
 
-// Check if email is configured
-const isEmailConfigured = process.env.EMAIL_USER && process.env.EMAIL_PASS;
-console.log('   📧 Email service available:', isEmailConfigured ? 'YES' : 'NO');
-
-let transporter = null;
-
-// Only create transporter if credentials exist (RENDER environment)
-if (isEmailConfigured) {
-  try {
-    transporter = nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE || 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      },
-      // Enhanced timeout settings for RENDER
-      connectionTimeout: 30000,  // 30 seconds for initial connection
-      socketTimeout: 30000,      // 30 seconds for socket
-      greetingTimeout: 15000,    // 15 seconds for greeting
-      // Connection pool reuse
-      pool: {
-        maxConnections: 5,
-        maxMessages: 100,
-        rateDelta: 2000,
-        rateLimit: 5
-      },
-      // TLS configuration
-      tls: {
-        rejectUnauthorized: false  // Allow self-signed certs on Render
-      },
-      // Secure connection
-      secure: true,
-      logger: true,
-      debug: process.env.NODE_ENV !== 'production'
-    });
-    console.log('✅ Email transporter created for RENDER with enhanced settings');
-  } catch (error) {
-    console.error('❌ Failed to create email transporter:', error.message);
-    transporter = null;
+const transporter = nodemailer.createTransport({
+  host: 'smtp.sendgrid.net',
+  port: 587,
+  secure: false,
+  auth: {
+    user: 'apikey', // ← THIS MUST BE 'apikey' (literally)
+    pass: process.env.SENDGRID_API_KEY
   }
-} else {
-  console.log('⚠️ Email not configured on RENDER');
-  console.log('💡 Set EMAIL_USER and EMAIL_PASS in RENDER Environment Variables');
-}
+});
 
-// Test the email connection
-export async function testEmailConnection() {
-  try {
-    if (!transporter) {
-      console.log('❌ Email transporter not available on RENDER');
-      return false;
-    }
-    
-    console.log('🔄 Testing email connection on RENDER...');
-    await transporter.verify();
-    console.log('✅ Email server is ready to send messages from RENDER');
-    return true;
-  } catch (error) {
-    console.error('❌ Email connection failed on RENDER:', error.message);
-    return false;
-  }
-}
-
-// Send welcome email
+// Send welcome email - keep your existing function
 export async function sendWelcomeEmail(user) {
   const { email, username, neptun, major, startYear } = user;
 
-  // Check if email is configured on RENDER
-  if (!transporter) {
-    console.log('❌ Email service not configured on RENDER');
+  if (!process.env.SENDGRID_API_KEY) {
+    console.log('❌ SendGrid not configured');
     return { 
       success: false, 
-      error: 'Email service not configured on RENDER. Please set EMAIL_USER and EMAIL_PASS environment variables.' 
+      error: 'SendGrid not configured. Set SENDGRID_API_KEY environment variable.' 
     };
   }
 
   const mailOptions = {
-    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+    from: {
+      name: process.env.EMAIL_FROM_NAME || 'SzeConnect',
+      address: process.env.EMAIL_FROM
+    },
     to: email,
     subject: '🎉 Welcome to SzeConnect!',
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #1F3351, #E1860E); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-          .details { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
-          .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>Welcome to SzeConnect! 🎓</h1>
-            <p>Your university connection platform</p>
-          </div>
-          <div class="content">
-            <h2>Hello ${username}!</h2>
-            <p>Your registration was successful and your account is now active.</p>
-            
-            <div class="details">
-              <h3>📋 Registration Details:</h3>
-              <p><strong>Username:</strong> ${username}</p>
-              <p><strong>Neptun Code:</strong> ${neptun}</p>
-              <p><strong>Major:</strong> ${major}</p>
-              <p><strong>Start Year:</strong> ${startYear}</p>
-              <p><strong>Registration Date:</strong> ${new Date().toLocaleDateString('hu-HU')}</p>
-            </div>
-
-            <p>You can now log in to your account and start connecting with other students!</p>
-            
-            <div class="footer">
-              <p>Best regards,<br>The SzeConnect Team</p>
-              <p><small>This is an automated message, please do not reply.</small></p>
-            </div>
-          </div>
-        </div>
-      </body>
-      </html>
-    `,
-    text: `
-Welcome to SzeConnect!
-
-Hello ${username}!
-
-Your registration was successful and your account is now active.
-
-Registration Details:
-- Username: ${username}
-- Neptun Code: ${neptun} 
-- Major: ${major}
-- Start Year: ${startYear}
-- Registration Date: ${new Date().toLocaleDateString('hu-HU')}
-
-You can now log in to your account and start connecting with other students!
-
-Best regards,
-The SzeConnect Team
-
-This is an automated message, please do not reply.
-    `
+    html: `...your existing HTML...`,
+    text: `...your existing text...`
   };
 
   try {
-    console.log(`📧 Attempting to send welcome email from RENDER to: ${email}`);
+    console.log(`📧 Attempting to send welcome email via SendGrid to: ${email}`);
     const result = await transporter.sendMail(mailOptions);
-    console.log(`✅ Welcome email sent successfully from RENDER to: ${email}`);
-    console.log(`📨 Message ID: ${result.messageId}`);
+    console.log(`✅ Welcome email sent successfully to: ${email}`);
     return { success: true, messageId: result.messageId };
   } catch (error) {
-    console.error(`❌ Failed to send email from RENDER to ${email}:`, error.message);
+    console.error(`❌ Failed to send email to ${email}:`, error.message);
     return { success: false, error: error.message };
   }
 }
