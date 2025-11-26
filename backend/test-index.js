@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import cors from 'cors';
 import pool, { testConnection } from './database.js';
 import { sendWelcomeEmail, testEmailConnection } from './services/emailService.js';
+import { handleForgotPassword } from './forgotpassword.js';
 
 dotenv.config();
 
@@ -383,6 +384,11 @@ app.post("/login", async (req, res) => {
     res.status(500).json({ message: "Internal server error during login" });
   }
 });
+
+// --------------------
+// FORGOT PASSWORD ROUTE
+// --------------------
+app.post("/forgot-password", handleForgotPassword);
 
 // --------------------
 // PROTECTED PROFILE ROUTE (POSTGRESQL)

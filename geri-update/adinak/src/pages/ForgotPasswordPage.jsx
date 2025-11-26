@@ -2,61 +2,64 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function ForgotPasswordPage() {
-  const [lang, setLang] = useState("hu");
+  const [lang, setLang] = useState(() => localStorage.getItem("lang") || "hu");
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const toggleLang = () => {
+  const newLang = lang === "hu" ? "en" : "hu";
+  setLang(newLang);
+  localStorage.setItem("lang", newLang);
+};
+
 
 
   const t = useMemo(() => {
     const hu = {
       title: "Elfelejtett jelszó",
       lead:
-        "Add meg a regisztrált e-mail címedet és a Neptun-kódodat. E-mailben küldünk egy ideiglenes jelszót, amit később megváltoztathatsz.",
+        "Add meg a regisztrált e-mail címedet. E-mailben küldünk egy ideiglenes jelszót, amit később megváltoztathatsz.",
       emailLabel: "E-mail cím",
       emailPh: "nev@example.com",
-      neptunLabel: "Neptun-kód",
-      neptunPh: "pl. ABC123",
       send: "E-mail küldése",
       back: "Vissza a bejelentkezéshez",
       errEmail: "Érvénytelen e-mail formátum.",
-      errNeptun: "A Neptun-kód 6 karakter, betű/szám.",
-      ok: "Ha az adatok egyeznek, elküldtük az ideiglenes jelszót.",
+      ok: "Az ideiglenes jelszót elküldtük az e-mail címedre. Kérlek ellenőrizd a postafiókod!",
+      sending: "Küldés...",
+      error: "Hiba történt. Kérlek próbálkozz később.",
       brand: "SzeConnect",
     };
     const en = {
       title: "Forgot Password",
       lead:
-        "Type your registered e-mail and Neptun code. We’ll send a temporary password you can change later.",
+        "Type your registered email address. We'll send a temporary password you can change later.",
       emailLabel: "Email address",
       emailPh: "name@example.com",
-      neptunLabel: "Neptun code",
-      neptunPh: "e.g. ABC123",
       send: "Send email",
       back: "Back to Login",
       errEmail: "Invalid email format.",
-      errNeptun: "Neptun code must be 6 alphanumeric characters.",
-      ok: "If the data matches, a temporary password has been sent.",
+      ok: "Temporary password sent to your email. Please check your inbox!",
+      sending: "Sending...",
+      error: "An error occurred. Please try again later.",
       brand: "SzeConnect",
     };
     return lang === "hu" ? hu : en;
   }, [lang]);
 
   const [email, setEmail] = useState("");
-  const [neptun, setNeptun] = useState("");
-  const [errors, setErrors] = useState({ email: "", neptun: "" });
+  const [errors, setErrors] = useState({ email: "" });
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState("");
+  const [noticeType, setNoticeType] = useState(""); // 'success' or 'error'
 
   const isEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
-  const isNeptun = (v) => /^[A-Za-z0-9]{6}$/.test(v.trim());
 
   const validate = () => {
     const e = {
       email: isEmail(email) ? "" : t.errEmail,
-      neptun: isNeptun(neptun) ? "" : t.errNeptun,
     };
     setErrors(e);
-    return !e.email && !e.neptun;
+    return !e.email;
   };
 
   const onSubmit = async (e) => {
@@ -65,12 +68,35 @@ export default function ForgotPasswordPage() {
     if (!validate()) return;
 
     setSending(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setSending(false);
-    setNotice(t.ok);
+    try {
+      const response = await fetch("http://localhost:4000/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.toLowerCase() }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setNoticeType("success");
+        setNotice(t.ok);
+        setEmail("");
+        // Redirect to login after 3 seconds
+        setTimeout(() => navigate("/login"), 3000);
+      } else {
+        setNoticeType("error");
+        setNotice(data.error || t.error);
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      setNoticeType("error");
+      setNotice(t.error);
+    } finally {
+      setSending(false);
+    }
   };
 
-  const disabled = sending || !email || !neptun;
+  const disabled = sending || !email;
 
   return (
     <div className="min-h-screen bg-[#FDFDFE] flex flex-col">
@@ -83,7 +109,7 @@ export default function ForgotPasswordPage() {
 
         <div className="flex items-center gap-4">
           <button
-            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+            onClick={toggleLang}
             className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
           >
             {lang === "hu" ? "EN" : "HU"}
@@ -100,7 +126,7 @@ export default function ForgotPasswordPage() {
 
       {/* MAIN CONTENT */}
       <main className="flex flex-col flex-1 items-center justify-center px-8 py-12">
-        <div className="w-full max-w-5xl bg-white rounded-2xl shadow-lg border border-[#1F3351]/10 p-12">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-lg border border-[#1F3351]/10 p-12">
           <h1 className="text-4xl font-bold text-[#1F3351] mb-6 text-center">
             {t.title}
           </h1>
@@ -108,36 +134,7 @@ export default function ForgotPasswordPage() {
             {t.lead}
           </p>
 
-          <form
-            onSubmit={onSubmit}
-            className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-6"
-            noValidate
-          >
-
-            {/* Neptun */}
-            <div>
-              <label className="block font-semibold text-[#1F3351] mb-2">
-                {t.neptunLabel}
-              </label>
-              <input
-                value={neptun}
-                onChange={(e) => setNeptun(e.target.value.toUpperCase())}
-                onBlur={validate}
-                placeholder={t.neptunPh}
-                className={`w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] text-[#1F3351] uppercase tracking-wider placeholder:text-[#1F3351]/70 ${
-                  errors.neptun
-                    ? "border-red-500 focus:ring-red-200"
-                    : "border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
-                }`}
-                maxLength={6}
-              />
-
-              {errors.neptun && (
-                <p className="text-red-600 text-sm mt-1">{errors.neptun}</p>
-              )}
-            </div>
-
-
+          <form onSubmit={onSubmit} className="flex flex-col gap-6" noValidate>
             {/* Email */}
             <div>
               <label className="block font-semibold text-[#1F3351] mb-2">
@@ -155,14 +152,13 @@ export default function ForgotPasswordPage() {
                     : "border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
                 }`}
               />
-
               {errors.email && (
                 <p className="text-red-600 text-sm mt-1">{errors.email}</p>
               )}
             </div>
 
             {/* Submit and Notice */}
-            <div className="md:col-span-2 flex flex-col items-center mt-6">
+            <div className="flex flex-col items-center mt-6">
               <button
                 type="submit"
                 disabled={disabled}
@@ -172,22 +168,16 @@ export default function ForgotPasswordPage() {
                     : "bg-[#E1860E] text-white hover:opacity-95"
                 }`}
               >
-                {sending ? "…" : t.send}
+                {sending ? t.sending : t.send}
               </button>
 
               {notice && (
-                <p className="mt-4 text-center text-[#1F3351] font-medium">
+                <p className={`mt-4 text-center font-medium ${
+                  noticeType === "success" ? "text-green-600" : "text-red-600"
+                }`}>
                   {notice}
                 </p>
               )}
-{/* 
-              <button
-                type="button"
-                onClick={() => navigate("/login")}
-                className="mt-6 rounded-xl bg-[#6C8EBF] text-white px-6 py-2 font-semibold shadow hover:opacity-95"
-              >
-                {t.back}
-              </button> */}
             </div>
           </form>
         </div>
