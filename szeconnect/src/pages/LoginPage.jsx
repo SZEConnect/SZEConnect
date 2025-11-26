@@ -6,9 +6,18 @@ export default function LoginPage() {
   const [neptun, setNeptun] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState({ neptun: "", password: "" });
-  const [lang, setLang] = useState("hu");
+  const [lang, setLang] = useState(() => localStorage.getItem("lang") || "hu");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const [showPassword, setShowPassword] = useState(false);
+  const [popup, setPopup] = useState({
+    show: false,
+    message: "",
+    type: "error",
+  });
+  
+
+
 
   const t = (key) => {
     const hu = {
@@ -53,6 +62,20 @@ export default function LoginPage() {
     return !errs.neptun && !errs.password;
   };
 
+  const translateError = (errMessage) => {
+  if (lang === "hu") {
+    if (errMessage.includes("Invalid credentials")) return "Érvénytelen belépési adatok";
+    if (errMessage.includes("User not found")) return "A felhasználó nem található";
+    if (errMessage.includes("Incorrect password")) return "Hibás jelszó";
+    if (errMessage.includes("Missing fields")) return "Hiányzó mezők";
+    return "Hibás bejelentkezés";
+  }
+
+  // English fallback (default)
+  return errMessage || "Login failed";
+};
+
+
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
@@ -62,7 +85,17 @@ export default function LoginPage() {
       localStorage.setItem("token", res.token);
       navigate("/home");
     } catch (err) {
-      alert(err.message);
+      const translated = translateError(err.message);
+
+      setPopup({
+        show: true,
+        message: translated,
+        type: "error",
+      });
+
+      setTimeout(() => {
+        setPopup({ show: false, message: "", type: "error" });
+      }, 2200);
     } finally {
       setIsLoading(false);
     }
@@ -70,11 +103,18 @@ export default function LoginPage() {
 
   const onRegister = () => navigate("/register");
 
+  const toggleLang = () => {
+  const newLang = lang === "hu" ? "en" : "hu";
+  setLang(newLang);
+  localStorage.setItem("lang", newLang);
+};
+
+
   return (
     <div className="min-h-screen w-full bg-[#FAFAFA] flex flex-col justify-center px-6 md:px-12 relative">
       {/* Language toggle */}
       <button
-        onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+        onClick={toggleLang}
         className="absolute top-6 right-6 rounded-lg px-3 py-1.5 bg-[#F4B740] text-[#1F3351] font-semibold text-sm shadow hover:opacity-90"
       >
         {lang === "hu" ? "EN" : "HU"}
@@ -124,22 +164,36 @@ export default function LoginPage() {
               <label htmlFor="password" className="block text-sm font-semibold text-[#1F3351]">
                 {t("password")}
               </label>
-              <input
-                id="password"
-                type="password"
-                className={`mt-2 w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] ${
-                  errors.password
-                    ? "border-red-500 focus:ring-red-200"
-                    : "border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
-                }`}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={isLoading}
-              />
+
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  className={`mt-2 w-full rounded-xl border-2 px-4 py-3 pr-12 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] ${
+                    errors.password
+                      ? "border-red-500 focus:ring-red-200"
+                      : "border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
+                  }`}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={isLoading}
+                />
+
+                {/* Eye icon */}
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-[52%] -translate-y-1/2 text-[#1F3351]/70 text-xl font-bold"
+                >
+                  {showPassword ? "◠" : "◉"}
+                </button>
+              </div>
+
               {errors.password && (
                 <p className="mt-2 text-sm text-red-600">{errors.password}</p>
               )}
             </div>
+
 
 
             {/* Buttons */}
@@ -184,6 +238,23 @@ export default function LoginPage() {
       <div className="absolute bottom-4 right-4 text-xs text-gray-500 select-none">
         {t("privacy")}
       </div>
+
+      {popup.show && (
+      <div
+        className={`
+          fixed top-8 left-1/2 -translate-x-1/2 z-[9999]
+          px-6 py-4 rounded-xl shadow-lg border
+          font-semibold transition-all duration-300
+          ${popup.type === "success"
+            ? "bg-[#2A3F5B] text-white border-[#E1860E]"
+            : "bg-red-600 text-white border-red-300"}
+        `}
+      >
+        {popup.message}
+      </div>
+    )}
+
+
     </div>
   );
 }

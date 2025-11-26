@@ -169,7 +169,7 @@ const PROGRAM_LIST = (lang) => {
 export default function UserProfilePage() {
   const { userId } = useParams();
   const navigate = useNavigate();
-  const [lang, setLang] = useState("hu");
+  const [lang, setLang] = useState(() => localStorage.getItem("lang") || "hu");
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [posts, setPosts] = useState([]);
@@ -177,6 +177,7 @@ export default function UserProfilePage() {
   const [editableUser, setEditableUser] = useState(null);
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  
 
   // PROGRAM LIST (same as RegisterPage)
   const programs = useMemo(() => PROGRAM_LIST(lang), [lang]);
@@ -185,6 +186,13 @@ export default function UserProfilePage() {
   const currentUserId = localStorage.getItem("userId");
   const isOwnProfile = !userId || userId === currentUserId;
   const profileUserId = userId || currentUserId;
+
+  const toggleLang = () => {
+  const newLang = lang === "hu" ? "en" : "hu";
+  setLang(newLang);
+  localStorage.setItem("lang", newLang);
+};
+
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -355,7 +363,7 @@ export default function UserProfilePage() {
         {/* Desktop buttons */}
         <div className="hidden md:flex items-center gap-4">
           <button
-            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+            onClick={toggleLang}
             className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
           >
             {lang === "hu" ? "EN" : "HU"}
@@ -400,7 +408,7 @@ export default function UserProfilePage() {
             <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
               <button
                 onClick={() => {
-                  setLang(lang === "hu" ? "en" : "hu");
+                  toggleLang();
                   setMenuOpen(false);
                 }}
                 className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"

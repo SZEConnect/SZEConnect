@@ -3,9 +3,16 @@ import { useNavigate } from "react-router-dom";
 
 export default function InterestsPage() {
   const navigate = useNavigate();
-  const [lang, setLang] = useState("hu");
+  const [lang, setLang] = useState(() => localStorage.getItem("lang") || "hu");
   const [selected, setSelected] = useState([]);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [popup, setPopup] = useState({ show: false, message: "", type: "success" });
+  const toggleLang = () => {
+  const newLang = lang === "hu" ? "en" : "hu";
+  setLang(newLang);
+  localStorage.setItem("lang", newLang);
+};
+
 
 
   const t = useMemo(() => {
@@ -74,8 +81,18 @@ export default function InterestsPage() {
 
   const onSave = () => {
     console.log("Saved groups:", selected);
-    alert(lang === "hu" ? "Mentve!" : "Saved!");
-    navigate("/home");
+    setPopup({
+      show: true,
+      message: lang === "hu" ? "Mentve!" : "Saved!",
+      type: "success",
+    });
+
+    // hide after 2 seconds
+    setTimeout(() => {
+      setPopup({ show: false, message: "", type: "success" });
+      navigate("/home");
+    }, 2000);
+
   };
 
   return (
@@ -95,7 +112,7 @@ export default function InterestsPage() {
       {/* Desktop buttons */}
       <div className="hidden md:flex items-center gap-4">
         <button
-          onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+          onClick={toggleLang}
           className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
         >
           {lang === "hu" ? "EN" : "HU"}
@@ -140,7 +157,7 @@ export default function InterestsPage() {
           <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
             <button
               onClick={() => {
-                setLang(lang === "hu" ? "en" : "hu");
+                toggleLang();
                 setMenuOpen(false);
               }}
               className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
@@ -252,6 +269,23 @@ export default function InterestsPage() {
             )}
           </div>
         </div>
+
+        {popup.show && (
+        <div
+          className={`
+            fixed top-8 left-1/2 -translate-x-1/2 z-[9999]
+            px-6 py-4 rounded-xl shadow-lg border
+            text-white font-semibold transition-all duration-300
+            ${popup.type === "success" 
+              ? "bg-[#2A3F5B] border-[#E1860E]" 
+              : "bg-red-600 border-red-300"}
+          `}
+        >
+          {popup.message}
+        </div>
+      )}
+
+
       </main>
 
       {/* SAVE BUTTON */}

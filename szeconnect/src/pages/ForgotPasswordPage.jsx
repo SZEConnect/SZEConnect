@@ -2,9 +2,16 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function ForgotPasswordPage() {
-  const [lang, setLang] = useState("hu");
+  const [lang, setLang] = useState(() => localStorage.getItem("lang") || "hu");
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const toggleLang = () => {
+  const newLang = lang === "hu" ? "en" : "hu";
+  setLang(newLang);
+  localStorage.setItem("lang", newLang);
+};
+
 
 
   const t = useMemo(() => {
@@ -83,7 +90,7 @@ export default function ForgotPasswordPage() {
 
         <div className="flex items-center gap-4">
           <button
-            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+            onClick={toggleLang}
             className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
           >
             {lang === "hu" ? "EN" : "HU"}

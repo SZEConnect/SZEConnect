@@ -6,7 +6,7 @@ export default function PostDetailsPage() {
   const { postId } = useParams();
   const navigate = useNavigate();
 
-  const [lang, setLang] = useState("hu");
+  const [lang, setLang] = useState(() => localStorage.getItem("lang") || "hu");
   const [loading, setLoading] = useState(true);
   const [post, setPost] = useState(null);
   const [votes, setVotes] = useState({ up: 0, down: 0, my: 0 });
@@ -16,8 +16,22 @@ export default function PostDetailsPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [token] = useState(localStorage.getItem('token'));
-    const [isFollowingGroup, setIsFollowingGroup] = useState(false);
+  const [isFollowingGroup, setIsFollowingGroup] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [popup, setPopup] = useState({
+    show: false,
+    message: "",
+    type: "success", // "success" | "error"
+  });
+
+  const toggleLang = () => {
+  const newLang = lang === "hu" ? "en" : "hu";
+  setLang(newLang);
+  localStorage.setItem("lang", newLang);
+};
+
+
+  
 
   const t = useMemo(() => {
     const hu = {
@@ -116,7 +130,15 @@ const handleFollowToggle = async () => {
   console.log("📝 Post groupId:", post?.groupId);
 
   if (!token) {
-    alert(lang === "hu" ? "Bejelentkezés szükséges a csoport követéséhez" : "Login required to follow group");
+    setPopup({
+      show: true,
+      message: lang === "hu"
+        ? "Bejelentkezés szükséges a csoport követéséhez"
+        : "Login required to follow group",
+      type: "error",
+    });
+    setTimeout(() => setPopup({ show: false, message: "", type: "error" }), 2200);
+
     return;
   }
 
@@ -152,7 +174,13 @@ const handleFollowToggle = async () => {
     }
   } catch (error) {
     console.error("🚨 API call failed:", error);
-    alert(lang === "hu" ? "Nem sikerült a művelet" : "Failed to perform action");
+    setPopup({
+      show: true,
+      message: lang === "hu" ? "Nem sikerült a művelet" : "Failed to perform action",
+      type: "error",
+    });
+    setTimeout(() => setPopup({ show: false, message: "", type: "error" }), 2200);
+
   } finally {
     setFollowLoading(false);
     console.log("🏁 Follow loading state set to false");
@@ -162,7 +190,15 @@ const handleFollowToggle = async () => {
 // UPDATE THESE LIKE FUNCTIONS
 const toggleUp = async () => {
   if (!token) {
-    alert(lang === "hu" ? "Bejelentkezés szükséges a szavazáshoz" : "Login required to vote");
+    setPopup({
+      show: true,
+      message: lang === "hu"
+        ? "Bejelentkezés szükséges a szavazáshoz"
+        : "Login required to vote",
+      type: "error",
+    });
+    setTimeout(() => setPopup({ show: false, message: "", type: "error" }), 2200);
+
     return;
   }
 
@@ -175,13 +211,27 @@ const toggleUp = async () => {
     }
   } catch (error) {
     console.error("Failed to update like:", error);
-    alert(lang === "hu" ? "Nem sikerült a szavazás" : "Failed to vote");
+    setPopup({
+      show: true,
+      message: lang === "hu" ? "Nem sikerült a szavazás" : "Failed to vote",
+      type: "error",
+    });
+    setTimeout(() => setPopup({ show: false, message: "", type: "error" }), 2200);
+
   }
 };
 
 const toggleDown = async () => {
   if (!token) {
-    alert(lang === "hu" ? "Bejelentkezés szükséges a szavazáshoz" : "Login required to vote");
+    setPopup({
+      show: true,
+      message: lang === "hu"
+        ? "Bejelentkezés szükséges a szavazáshoz"
+        : "Login required to vote",
+      type: "error",
+    });
+    setTimeout(() => setPopup({ show: false, message: "", type: "error" }), 2200);
+
     return;
   }
 
@@ -194,7 +244,13 @@ const toggleDown = async () => {
     }
   } catch (error) {
     console.error("Failed to update dislike:", error);
-    alert(lang === "hu" ? "Nem sikerült a szavazás" : "Failed to vote");
+    setPopup({
+      show: true,
+      message: lang === "hu" ? "Nem sikerült a szavazás" : "Failed to vote",
+      type: "error",
+    });
+    setTimeout(() => setPopup({ show: false, message: "", type: "error" }), 2200);
+
   }
 };
 
@@ -211,7 +267,15 @@ const toggleDown = async () => {
       }
     } catch (error) {
       console.error("Failed to submit comment:", error);
-      alert(lang === "hu" ? "Nem sikerült elküldeni a hozzászólást" : "Failed to post comment");
+      setPopup({
+        show: true,
+        message: lang === "hu"
+          ? "Nem sikerült elküldeni a hozzászólást"
+          : "Failed to post comment",
+        type: "error",
+      });
+      setTimeout(() => setPopup({ show: false, message: "", type: "error" }), 2200);
+
     }
   };
 
@@ -238,7 +302,20 @@ const toggleDown = async () => {
       }
     } catch (error) {
       console.error("Failed to submit reply:", error);
-      alert(lang === "hu" ? "Nem sikerült elküldeni a választ" : "Failed to post reply");
+      setPopup({
+        show: true,
+        message: lang === "hu" ? "Nem sikerült elküldeni a választ" : "Failed to post reply",
+        type: "error",
+      });
+      setTimeout(() => setPopup({ show: false, message: "", type: "error" }), 2200);
+      setPopup({
+        show: true,
+        message: lang === "hu" ? "Válasz elküldve!" : "Reply posted!",
+        type: "success",
+      });
+      setTimeout(() => setPopup({ show: false, message: "", type: "success" }), 2200);
+
+
     }
   };
 
@@ -273,7 +350,7 @@ const toggleDown = async () => {
         {/* Desktop buttons */}
         <div className="hidden md:flex items-center gap-4">
           <button
-            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+            onClick={toggleLang}
             className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
           >
             {lang === "hu" ? "EN" : "HU"}
@@ -318,7 +395,7 @@ const toggleDown = async () => {
             <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
               <button
                 onClick={() => {
-                  setLang(lang === "hu" ? "en" : "hu");
+                  toggleLang();
                   setMenuOpen(false);
                 }}
                 className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
@@ -433,11 +510,28 @@ const toggleDown = async () => {
                 
                 {/* REPORT POST BUTTON */}
                 <button
-                  onClick={() => alert(lang === "hu" ? "Bejegyzés jelentve" : "Post reported")}
+                  onClick={() => {
+                    setPopup({
+                      show: true,
+                      message: lang === "hu" ? "Bejegyzés jelentve" : "Post reported",
+                      type: "success",
+                    });
+
+                    setTimeout(
+                      () =>
+                        setPopup({
+                          show: false,
+                          message: "",
+                          type: "success",
+                        }),
+                      2200
+                    );
+                  }}
                   className="rounded-lg bg-[#6C8EBF] text-white px-4 py-2 text-sm font-semibold shadow hover:opacity-90"
                 >
                   {lang === "hu" ? "Bejegyzés jelentése" : "Report Post"}
                 </button>
+
               </div>
             </div>
 
@@ -548,11 +642,28 @@ const toggleDown = async () => {
 
                       {/* REPORT COMMENT BUTTON */}
                       <button
-                        onClick={() => alert(lang === "hu" ? "Hozzászólás jelentve" : "Comment reported")}
+                        onClick={() => {
+                          setPopup({
+                            show: true,
+                            message: lang === "hu" ? "Hozzászólás jelentve" : "Comment reported",
+                            type: "success",
+                          });
+
+                          setTimeout(
+                            () =>
+                              setPopup({
+                                show: false,
+                                message: "",
+                                type: "success",
+                              }),
+                            2200
+                          );
+                        }}
                         className="rounded-lg bg-[#6C8EBF] text-white px-4 py-2 text-sm font-semibold shadow hover:opacity-90"
                       >
                         {lang === "hu" ? "Jelentés" : "Report"}
                       </button>
+
                     </header>
 
                     <p className="text-[#1F3351]/90 whitespace-pre-wrap">
@@ -631,11 +742,28 @@ const toggleDown = async () => {
 
                                 {/* REPORT REPLY BUTTON */}
                                 <button
-                                  onClick={() => alert(lang === "hu" ? "Válasz jelentve" : "Reply reported")}
+                                  onClick={() => {
+                                    setPopup({
+                                      show: true,
+                                      message: lang === "hu" ? "Válasz jelentve" : "Reply reported",
+                                      type: "success",
+                                    });
+
+                                    setTimeout(
+                                      () =>
+                                        setPopup({
+                                          show: false,
+                                          message: "",
+                                          type: "success",
+                                        }),
+                                      2200
+                                    );
+                                  }}
                                   className="rounded-lg bg-[#6C8EBF] text-white px-4 py-2 text-sm font-semibold shadow hover:opacity-90"
                                 >
                                   {lang === "hu" ? "Jelentés" : "Report"}
                                 </button>
+
                               </div>
 
                               <p className="text-sm text-[#1F3351]/80 mt-2">
@@ -708,6 +836,25 @@ const toggleDown = async () => {
           )}
         </button>
       </div>
+
+      {popup.show && (
+      <div
+        className={`
+          fixed top-8 left-1/2 -translate-x-1/2 z-[9999]
+          px-6 py-4 rounded-xl shadow-lg border
+          font-semibold transition-all duration-300
+          ${
+            popup.type === "success"
+              ? "bg-[#2A3F5B] text-white border-[#E1860E]"
+              : "bg-red-600 text-white border-red-300"
+          }
+        `}
+      >
+        {popup.message}
+      </div>
+    )}
+
+
     </div>
   );
 }

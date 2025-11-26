@@ -5,7 +5,7 @@ import { api } from "../lib/api";
 export default function GroupPage() {
   const { groupId } = useParams();
   const navigate = useNavigate();
-  const [lang, setLang] = useState("hu");
+  const [lang, setLang] = useState(() => localStorage.getItem("lang") || "hu");
   const [loading, setLoading] = useState(true);
   const [group, setGroup] = useState(null);
   const [posts, setPosts] = useState([]);
@@ -16,6 +16,18 @@ export default function GroupPage() {
   const [token] = useState(localStorage.getItem('token'));
   const [sortBy, setSortBy] = useState("date"); // "date" or "popularity"
   const [postsWithLikes, setPostsWithLikes] = useState([]);
+  const [popup, setPopup] = useState({
+    show: false,
+    message: "",
+    type: "success", // or "error"
+  });
+
+  const toggleLang = () => {
+  const newLang = lang === "hu" ? "en" : "hu";
+  setLang(newLang);
+  localStorage.setItem("lang", newLang);
+};
+
 
   const t = useMemo(() => {
     const hu = {
@@ -226,7 +238,13 @@ export default function GroupPage() {
       }
     } catch (error) {
       console.error("🚨 API call failed:", error);
-      alert(joined ? t.leaveError : t.joinError);
+      setPopup({
+        show: true,
+        message: joined ? t.leaveError : t.joinError,
+        type: "error",
+      });
+      setTimeout(() => setPopup({ show: false, message: "", type: "error" }), 2200);
+
     }
   };
 
@@ -261,7 +279,7 @@ export default function GroupPage() {
         {/* Desktop buttons */}
         <div className="hidden md:flex items-center gap-4">
           <button
-            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+            onClick={toggleLang}
             className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
           >
             {lang === "hu" ? "EN" : "HU"}
@@ -306,7 +324,7 @@ export default function GroupPage() {
             <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
               <button
                 onClick={() => {
-                  setLang(lang === "hu" ? "en" : "hu");
+                  toggleLang();
                   setMenuOpen(false);
                 }}
                 className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
@@ -427,11 +445,28 @@ export default function GroupPage() {
             </button>
 
             <button
-              onClick={() => alert(lang === "hu" ? "Csoport jelentve" : "Group reported")}
+              onClick={() => {
+                setPopup({
+                  show: true,
+                  message: lang === "hu" ? "Csoport jelentve" : "Group reported",
+                  type: "success",
+                });
+
+                setTimeout(
+                  () =>
+                    setPopup({
+                      show: false,
+                      message: "",
+                      type: "success",
+                    }),
+                  2200
+                );
+              }}
               className="rounded-lg bg-[#6C8EBF] text-white px-4 py-2 text-sm font-semibold shadow hover:opacity-90"
             >
               {lang === "hu" ? "Csoport jelentése" : "Report Group"}
             </button>
+
 
             {/* Edit Group button - only show if user is creator/admin */}
             <button
@@ -561,6 +596,23 @@ export default function GroupPage() {
           </button>
         </div>
       </main>
+
+      {popup.show && (
+        <div
+          className={`
+            fixed top-8 left-1/2 -translate-x-1/2 z-[9999]
+            px-6 py-4 rounded-xl shadow-lg border
+            font-semibold transition-all duration-300
+            ${popup.type === "success"
+              ? "bg-[#2A3F5B] text-white border-[#E1860E]"
+              : "bg-red-600 text-white border-red-300"}
+          `}
+        >
+          {popup.message}
+        </div>
+      )}
+
+
     </div>
   );
 }

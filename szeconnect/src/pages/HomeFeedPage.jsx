@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 
 export default function HomeFeedPage() {
-  const [lang, setLang] = useState("hu");
+  const [lang, setLang] = useState(() => localStorage.getItem("lang") || "hu");
   const [query, setQuery] = useState("");
   const [showGroups, setShowGroups] = useState(false);
   const [showCreateMenu, setShowCreateMenu] = useState(false);
@@ -16,6 +16,15 @@ export default function HomeFeedPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [postsLoading, setPostsLoading] = useState(true);
+  const [sortMode, setSortMode] = useState("date"); // "date" | "popularity"
+
+  const toggleLang = () => {
+  const newLang = lang === "hu" ? "en" : "hu";
+  setLang(newLang);
+  localStorage.setItem("lang", newLang);
+};
+
+
 
   const t = useMemo(() => {
     const hu = {
@@ -224,7 +233,7 @@ useEffect(() => {
               {post.group && (
                 <button
                   onClick={() => navigate(`/groups/${post.groupId}`)}
-                  className="text-[#E1860E] font-semibold hover:underline ml-2 shrink-0"
+                  className="text-[#E1860E] font-semibold hover:underline ml-2 shrink-0 max-w-[120px] truncate text-right"
                 >
                   {post.group}
                 </button>
@@ -282,7 +291,7 @@ useEffect(() => {
                 <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
                   <button
                     onClick={() => {
-                      setLang(lang === 'hu' ? 'en' : 'hu');
+                      toggleLang();
                       setMenuOpen(false);
                     }}
                     className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
@@ -341,7 +350,7 @@ useEffect(() => {
           {/* Right-side buttons (desktop only) */}
           <div className="hidden md:flex items-center gap-4">
             <button
-              onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+              onClick={toggleLang}
               className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
             >
               {lang === "hu" ? "EN" : "HU"}
@@ -400,7 +409,7 @@ useEffect(() => {
           </h1>
 
           {/* Top controls in content: groups toggle + sort buttons */}
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
 
             {/* Left: Groups button */}
             <button
@@ -412,13 +421,31 @@ useEffect(() => {
 
             {/* Right: SORT BUTTONS */}
             <div className="flex items-center gap-3">
-              <button className="rounded-lg bg-[#6C8EBF] text-white px-4 py-2 text-sm font-semibold shadow hover:opacity-90">
+              <button
+                onClick={() => setSortMode("popularity")}
+                className={`
+                  px-4 py-2 rounded-lg text-sm font-semibold shadow transition
+                  ${sortMode === "popularity"
+                    ? "bg-[#E1860E] text-white"
+                    : "bg-[#6C8EBF] text-white hover:opacity-90"}
+                `}
+              >
                 {t.sortPopularity}
               </button>
-              <button className="rounded-lg bg-[#6C8EBF] text-white px-4 py-2 text-sm font-semibold shadow hover:opacity-90">
+
+              <button
+                onClick={() => setSortMode("date")}
+                className={`
+                  px-4 py-2 rounded-lg text-sm font-semibold shadow transition
+                  ${sortMode === "date"
+                    ? "bg-[#E1860E] text-white"
+                    : "bg-[#6C8EBF] text-white hover:opacity-90"}
+                `}
+              >
                 {t.sortDate}
               </button>
             </div>
+
           </div>
 
 

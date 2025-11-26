@@ -8,9 +8,22 @@ export default function PostComposerPage() {
   const contentFileRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [token] = useState(localStorage.getItem('token'));
+  const [popup, setPopup] = useState({
+    show: false,
+    message: "",
+    type: "success", // "success" | "error"
+  });
+
+
 
   // ── i18n ────────────────────────────────
-  const [lang, setLang] = useState("hu");
+  const [lang, setLang] = useState(() => localStorage.getItem("lang") || "hu");
+  const toggleLang = () => {
+  const newLang = lang === "hu" ? "en" : "hu";
+  setLang(newLang);
+  localStorage.setItem("lang", newLang);
+};
+
   const t = useMemo(() => {
     const hu = {
       brand: "SzeConnect",
@@ -175,16 +188,62 @@ const onSubmit = async (e) => {
     const response = await api.createPost(payload, images, token);
     
     if (response.success) {
-      alert(t.postSuccess);
       // Clean up object URLs
-      images.forEach(img => URL.revokeObjectURL(img.url));
-      // Navigate to the group page
-      navigate(`/groups/${group.id}`);
-    }
+      images.forEach((img) => URL.revokeObjectURL(img.url));
+
+      setPopup({
+        show: true,
+        message: t.postSuccess,
+        type: "success",
+      });
+
+      // Hide popup and then navigate to the group page
+      setTimeout(() => {
+        setPopup({
+          show: false,
+          message: "",
+          type: "success",
+        });
+        navigate(`/groups/${group.id}`);
+      }, 1800);
+    } else {
+  setPopup({
+    show: true,
+    message: t.postError,
+    type: "error",
+  });
+  setTimeout(
+    () =>
+      setPopup({
+        show: false,
+        message: "",
+        type: "error",
+      }),
+    2200
+  );
+}
+
+
   } catch (error) {
     console.error("Failed to create post:", error);
-    alert(t.postError + ": " + (error.message || "Unknown error"));
+
+    setPopup({
+      show: true,
+      message: t.postError,
+      type: "error",
+    });
+
+    setTimeout(
+      () =>
+        setPopup({
+          show: false,
+          message: "",
+          type: "error",
+        }),
+      2200
+    );
   } finally {
+
     setSubmitting(false);
   }
 };
@@ -206,7 +265,7 @@ const onSubmit = async (e) => {
         {/* Desktop buttons */}
         <div className="hidden md:flex items-center gap-4">
           <button
-            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+            onClick={toggleLang}
             className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
           >
             {lang === "hu" ? "EN" : "HU"}
@@ -251,7 +310,7 @@ const onSubmit = async (e) => {
             <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
               <button
                 onClick={() => {
-                  setLang(lang === "hu" ? "en" : "hu");
+                  toggleLang();
                   setMenuOpen(false);
                 }}
                 className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
@@ -483,6 +542,24 @@ const onSubmit = async (e) => {
           </form>
         </div>
       </main>
+      
+        {popup.show && (
+        <div
+          className={`
+            fixed top-8 left-1/2 -translate-x-1/2 z-[9999]
+            px-6 py-4 rounded-xl shadow-lg border
+            font-semibold transition-all duration-300
+            ${
+              popup.type === "success"
+                ? "bg-[#2A3F5B] text-white border-[#E1860E]"
+                : "bg-red-600 text-white border-red-300"
+            }
+          `}
+        >
+          {popup.message}
+        </div>
+      )}
+
     </div>
   );
 }

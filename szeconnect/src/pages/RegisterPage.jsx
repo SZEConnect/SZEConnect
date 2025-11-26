@@ -3,10 +3,19 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 
 export default function RegisterPage() {
-  const [lang, setLang] = useState("hu");
+  const [lang, setLang] = useState(() => localStorage.getItem("lang") || "hu");
   const navigate = useNavigate();
   const onInfo = () => navigate("/info");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [popup, setPopup] = useState({ show: false, type: "success", message: "" });
+
+  const showPopup = (type, message) => {
+  setPopup({ show: true, type, message });
+  setTimeout(() => {
+    setPopup({ show: false, type, message: "" });
+  }, 3000);
+};
+
 
 
   const t = useMemo(() => {
@@ -375,6 +384,39 @@ export default function RegisterPage() {
   };
 
  // ----- Submit -----
+
+ const translateRegisterError = (errMessage) => {
+  if (lang === "hu") {
+    if (errMessage.includes("Username already exists"))
+      return "A felhasználónév már foglalt.";
+
+    if (errMessage.includes("Email already exists"))
+      return "Ez az email cím már regisztrálva van.";
+
+    if (
+      errMessage.includes("Neptun already registered") ||
+      errMessage.includes("Neptun code already in use")
+    )
+      return "Ezzel a Neptun-kóddal már van fiók.";
+
+    if (errMessage.includes("Invalid Neptun code"))
+      return "Érvénytelen Neptun-kód.";
+
+    if (errMessage.includes("Weak password"))
+      return "Gyenge jelszó. Kövesd a megadott szabályokat.";
+
+    if (errMessage.includes("Missing fields"))
+      return "Tölts ki minden kötelező mezőt.";
+
+    return "A regisztráció sikertelen volt.";
+  }
+
+  // English fallback
+  return errMessage || "Registration failed.";
+};
+
+
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
@@ -411,13 +453,37 @@ export default function RegisterPage() {
       // Ensure your api.register function can handle FormData (see step 2 below)
       await api.register(formData); 
       
-      alert(lang === "hu" ? "Sikeres regisztráció!" : "Registration successful!");
-      navigate("/interests"); // Or wherever you want to redirect
+      showPopup(
+        "success",
+        lang === "hu" ? "Sikeres regisztráció!" : "Registration successful!"
+      );
+      setTimeout(() => navigate("/interests"), 1500);
+
     } catch (err) {
-      console.error(err);
-      alert(err.message || "Registration failed");
+      console.error("REGISTRATION ERROR:", err);
+
+      // Get backend error safely
+      const backendMessage =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err.message ||
+        "";
+
+      const translated = translateRegisterError(backendMessage);
+
+      showPopup("error", translated);
     }
+
+
   };
+
+
+  const toggleLang = () => {
+  const newLang = lang === "hu" ? "en" : "hu";
+  setLang(newLang);
+  localStorage.setItem("lang", newLang);
+};
+
 
   // ----- Render -----
   return (
@@ -431,7 +497,7 @@ export default function RegisterPage() {
         <div className="flex items-center gap-4">
           {/* Language toggle (left) */}
           <button
-            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+            onClick={toggleLang}
             className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
           >
             {lang === "hu" ? "EN" : "HU"}
@@ -693,6 +759,24 @@ export default function RegisterPage() {
             </div>
           </form>
         </div>
+
+        {/* Custom popup */}
+        {popup.show && (
+          <div
+            className={`
+              fixed top-8 left-1/2 -translate-x-1/2 z-[9999]
+              px-6 py-4 rounded-xl shadow-lg border
+              text-white font-semibold transition-all duration-300
+              ${popup.type === "success" 
+                ? "bg-[#2A3F5B] border-[#E1860E]" 
+                : "bg-red-600 border-red-300"}
+            `}
+          >
+            {popup.message}
+          </div>
+        )}
+
+
       </main>
     </div>
   );
