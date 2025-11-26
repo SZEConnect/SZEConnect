@@ -43,19 +43,11 @@ const __dirname = path.dirname(__filename);
 
 
 
-// Add Multer configuration HERE
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, 'uploads')); // Use absolute path
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'post-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
+// ✅ HASZNÁLD EZT - memoryStorage Cloudinary-hoz
+const postStorage = multer.memoryStorage(); // ← Fájlok a memóriában
 
 const upload = multer({
-  storage: storage,
+  storage: postStorage, // ← memoryStorage!
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit
   },
@@ -1214,7 +1206,7 @@ app.post("/posts/:postId/comments", async (req, res) => {
 });
 
 // --------------------
-// POST CREATION ENDPOINT WITH IMAGES - FIXED
+// POST CREATION ENDPOINT WITH CLOUDINARY - FIXED
 // --------------------
 
 // Create a wrapper function to extract token before multer
@@ -1246,10 +1238,11 @@ const authenticateToken = (req, res, next) => {
 // Update the endpoint - authenticate FIRST, then multer
 app.post("/posts", authenticateToken, upload.array('images', 5), async (req, res) => {
   try {
-    const userId = req.user.id; // Now we get user from the authenticated request
+    const userId = req.user.id;
     const { title, content, groupId } = req.body;
 
     console.log("🔄 Creating post for user:", userId);
+    console.log("📸 Received files:", req.files?.length || 0);
 
     // Validation
     if (!title || title.trim() === '') {
@@ -1279,7 +1272,7 @@ app.post("/posts", authenticateToken, upload.array('images', 5), async (req, res
       });
     }
 
-    // Check if user exists (optional, since we already authenticated)
+    // Check if user exists
     const userResult = await pool.query(
       'SELECT * FROM users WHERE user_id = $1',
       [userId]
@@ -1292,11 +1285,41 @@ app.post("/posts", authenticateToken, upload.array('images', 5), async (req, res
       });
     }
 
-    // Handle multiple images - store as JSON array
+    // 🔄 CLOUDINARY IMAGE UPLOAD - FIXED VERSION
     let imageVideoUrl = null;
     if (req.files && req.files.length > 0) {
-      const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
-      imageVideoUrl = JSON.stringify(imageUrls);
+      console.log("☁️ Uploading post images to Cloudinary...");
+      console.log("📊 File details:", req.files.map(f => ({
+        originalname: f.originalname,
+        size: f.size,
+        mimetype: f.mimetype,
+        bufferLength: f.buffer?.length
+      })));
+      
+      try {
+        // Upload each image to Cloudinary
+        const uploadPromises = req.files.map(file => 
+          uploadToCloudinary(file.buffer, 'szeconnect-posts')
+        );
+        
+        const cloudinaryResults = await Promise.all(uploadPromises);
+        const imageUrls = cloudinaryResults.map(result => result.secure_url);
+        imageVideoUrl = JSON.stringify(imageUrls);
+        
+        console.log("✅ Post images uploaded to Cloudinary:", imageUrls);
+      } catch (uploadError) {
+        console.error("❌ Cloudinary upload failed:", uploadError);
+        // Option 1: Fail the entire post creation
+        return res.status(500).json({ 
+          success: false, 
+          message: "Failed to upload images to Cloudinary",
+          error: uploadError.message 
+        });
+        
+        // Option 2: Continue without images (uncomment if preferred)
+        // console.log("⚠️ Continuing post creation without images");
+        // imageVideoUrl = null;
+      }
     }
 
     // Insert the post with image_video field
@@ -1311,7 +1334,7 @@ app.post("/posts", authenticateToken, upload.array('images', 5), async (req, res
         title.trim(),
         content ? content.trim() : null,
         new Date(),
-        imageVideoUrl
+        imageVideoUrl  // Cloudinary URLs in JSON format
       ]
     );
 
@@ -1335,7 +1358,7 @@ app.post("/posts", authenticateToken, upload.array('images', 5), async (req, res
         authorName: user.username,
         groupId: groupId,
         group: group.group_name,
-        images: imageVideoUrl ? JSON.parse(imageVideoUrl) : []
+        images: imageVideoUrl ? JSON.parse(imageVideoUrl) : [] // Cloudinary URLs
       }
     });
     
@@ -1343,7 +1366,8 @@ app.post("/posts", authenticateToken, upload.array('images', 5), async (req, res
     console.error("❌ Error creating post:", error);
     res.status(500).json({ 
       success: false, 
-      message: "Failed to create post" 
+      message: "Failed to create post",
+      error: error.message 
     });
   }
 });
