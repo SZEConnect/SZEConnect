@@ -1,58 +1,57 @@
-// services/emailService.js - ES Module version
+// services/emailService.js - RENDER COMPATIBLE (FIXED)
 import nodemailer from 'nodemailer';
-import path from 'path';
-import fs from 'fs';
-import dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
 
-// Get __dirname equivalent in ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Load environment variables with absolute path
-const envPath = path.join(__dirname, '..', '.env');
-console.log('🔧 Loading .env from:', envPath);
-console.log('🔧 .env exists?', fs.existsSync(envPath));
-
-dotenv.config({ path: envPath });
-
-// Debug: Check ALL environment variables
-console.log('🔧 All environment variables:');
-console.log('   PORT:', process.env.PORT);
-console.log('   JWT_SECRET:', process.env.JWT_SECRET ? 'Set' : 'Not set');
-console.log('   EMAIL_SERVICE:', process.env.EMAIL_SERVICE);
-console.log('   EMAIL_USER:', process.env.EMAIL_USER);
+// Debug: Check email environment variables for RENDER
+console.log('🔧 Email Configuration Check on RENDER:');
+console.log('   EMAIL_SERVICE:', process.env.EMAIL_SERVICE || 'Not set');
+console.log('   EMAIL_USER:', process.env.EMAIL_USER || 'Not set');
 console.log('   EMAIL_PASS:', process.env.EMAIL_PASS ? '***' + process.env.EMAIL_PASS.slice(-4) : 'Not set');
-console.log('   EMAIL_FROM:', process.env.EMAIL_FROM);
+console.log('   EMAIL_FROM:', process.env.EMAIL_FROM || 'Not set');
 
-// Create transporter (Gmail connection)
-const transporter = nodemailer.createTransport({
-  service: process.env.EMAIL_SERVICE || 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  connectionTimeout: 10000,  // 10 seconds
-  socketTimeout: 10000,       // 10 seconds
-  greetingTimeout: 10000      // 10 seconds
-});
+// Check if email is configured
+const isEmailConfigured = process.env.EMAIL_USER && process.env.EMAIL_PASS;
+console.log('   📧 Email service available:', isEmailConfigured ? 'YES' : 'NO');
+
+let transporter = null;
+
+// Only create transporter if credentials exist (RENDER environment)
+if (isEmailConfigured) {
+  try {
+    transporter = nodemailer.createTransport({
+      service: process.env.EMAIL_SERVICE || 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      },
+      // Timeout settings for RENDER
+      connectionTimeout: 15000,
+      socketTimeout: 15000,
+      greetingTimeout: 10000
+    });
+    console.log('✅ Email transporter created for RENDER');
+  } catch (error) {
+    console.error('❌ Failed to create email transporter:', error.message);
+    transporter = null;
+  }
+} else {
+  console.log('⚠️ Email not configured on RENDER');
+  console.log('💡 Set EMAIL_USER and EMAIL_PASS in RENDER Environment Variables');
+}
 
 // Test the email connection
 export async function testEmailConnection() {
   try {
-    // Additional check for credentials
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      console.log('❌ Email credentials missing:');
-      console.log('   EMAIL_USER:', process.env.EMAIL_USER || 'MISSING');
-      console.log('   EMAIL_PASS:', process.env.EMAIL_PASS ? 'SET' : 'MISSING');
+    if (!transporter) {
+      console.log('❌ Email transporter not available on RENDER');
       return false;
     }
     
+    console.log('🔄 Testing email connection on RENDER...');
     await transporter.verify();
-    console.log('✅ Email server is ready to send messages');
+    console.log('✅ Email server is ready to send messages from RENDER');
     return true;
   } catch (error) {
-    console.error('❌ Email connection failed:', error.message);
+    console.error('❌ Email connection failed on RENDER:', error.message);
     return false;
   }
 }
@@ -61,10 +60,13 @@ export async function testEmailConnection() {
 export async function sendWelcomeEmail(user) {
   const { email, username, neptun, major, startYear } = user;
 
-  // Check if we have email credentials
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.log('❌ Cannot send email - credentials not configured');
-    return { success: false, error: 'Email service not configured' };
+  // Check if email is configured on RENDER
+  if (!transporter) {
+    console.log('❌ Email service not configured on RENDER');
+    return { 
+      success: false, 
+      error: 'Email service not configured on RENDER. Please set EMAIL_USER and EMAIL_PASS environment variables.' 
+    };
   }
 
   const mailOptions = {
@@ -138,16 +140,13 @@ This is an automated message, please do not reply.
   };
 
   try {
-    console.log(`📧 Attempting to send welcome email to: ${email}`);
+    console.log(`📧 Attempting to send welcome email from RENDER to: ${email}`);
     const result = await transporter.sendMail(mailOptions);
-    console.log(`✅ Welcome email sent successfully to: ${email}`);
+    console.log(`✅ Welcome email sent successfully from RENDER to: ${email}`);
     console.log(`📨 Message ID: ${result.messageId}`);
     return { success: true, messageId: result.messageId };
   } catch (error) {
-    console.error(`❌ Failed to send email to ${email}:`, error.message);
+    console.error(`❌ Failed to send email from RENDER to ${email}:`, error.message);
     return { success: false, error: error.message };
   }
 }
-
-// Alternative: You could also export as default
-// export default { testEmailConnection, sendWelcomeEmail };
