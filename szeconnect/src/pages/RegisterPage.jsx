@@ -351,8 +351,8 @@ export default function RegisterPage() {
     const reEmail = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
     const reStrong = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
 
-    if (!form.firstName.trim()) e.firstName = t.errors.firstName;
-    if (!form.lastName.trim()) e.lastName = t.errors.lastName;
+    // if (!form.firstName.trim()) e.firstName = t.errors.firstName;
+    // if (!form.lastName.trim()) e.lastName = t.errors.lastName;
 
     if (!form.username) e.username = t.errors.required;
     else if (!reUser.test(form.username)) e.username = t.errors.username;
@@ -521,7 +521,7 @@ export default function RegisterPage() {
 
           <form onSubmit={handleSubmit} className="grid gap-8 md:grid-cols-2 xl:grid-cols-3 w-full">
             {/* First & Last Name */}
-            <Field label={`${t.firstName}${t.requiredMark}`} error={errors.firstName}>
+            <Field label={t.firstName} error={errors.firstName}>
               <input
                 className={inputCls(errors.firstName)}
                 value={form.firstName}
@@ -530,7 +530,7 @@ export default function RegisterPage() {
                 autoComplete="given-name"
               />
             </Field>
-            <Field label={`${t.lastName}${t.requiredMark}`} error={errors.lastName}>
+            <Field label={t.lastName} error={errors.lastName}>
               <input
                 className={inputCls(errors.lastName)}
                 value={form.lastName}
