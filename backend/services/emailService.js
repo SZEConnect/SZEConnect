@@ -1,4 +1,4 @@
-// services/emailService.js - RENDER COMPATIBLE
+// services/emailService.js - RENDER COMPATIBLE (FIXED)
 import nodemailer from 'nodemailer';
 
 // Debug: Check email environment variables for RENDER
@@ -149,9 +149,4 @@ This is an automated message, please do not reply.
     console.error(`❌ Failed to send email from RENDER to ${email}:`, error.message);
     return { success: false, error: error.message };
   }
-}
-
-// Check if email is configured
-export function isEmailConfigured() {
-  return !!transporter;
 }
