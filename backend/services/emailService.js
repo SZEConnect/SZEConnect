@@ -1,4 +1,4 @@
-// services/emailService.js - RENDER COMPATIBLE (FIXED)
+// services/emailService.js - RENDER COMPATIBLE (ENHANCED)
 import nodemailer from 'nodemailer';
 
 // Debug: Check email environment variables for RENDER
@@ -23,12 +23,27 @@ if (isEmailConfigured) {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
       },
-      // Timeout settings for RENDER
-      connectionTimeout: 15000,
-      socketTimeout: 15000,
-      greetingTimeout: 10000
+      // Enhanced timeout settings for RENDER
+      connectionTimeout: 30000,  // 30 seconds for initial connection
+      socketTimeout: 30000,      // 30 seconds for socket
+      greetingTimeout: 15000,    // 15 seconds for greeting
+      // Connection pool reuse
+      pool: {
+        maxConnections: 5,
+        maxMessages: 100,
+        rateDelta: 2000,
+        rateLimit: 5
+      },
+      // TLS configuration
+      tls: {
+        rejectUnauthorized: false  // Allow self-signed certs on Render
+      },
+      // Secure connection
+      secure: true,
+      logger: true,
+      debug: process.env.NODE_ENV !== 'production'
     });
-    console.log('✅ Email transporter created for RENDER');
+    console.log('✅ Email transporter created for RENDER with enhanced settings');
   } catch (error) {
     console.error('❌ Failed to create email transporter:', error.message);
     transporter = null;
