@@ -296,7 +296,7 @@ useEffect(() => {
                     }}
                     className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
                   >
-                    ???? {lang === 'hu' ? 'EN' : 'HU'}
+                    🌐 {lang === 'hu' ? 'EN' : 'HU'}
                   </button>
 
                   <button
@@ -316,7 +316,7 @@ useEffect(() => {
                     }}
                     className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
                   >
-                    ???? {t.profile}
+                    👤 {t.profile}
                   </button>
 
                   <button
@@ -326,7 +326,7 @@ useEffect(() => {
                     }}
                     className="w-full text-left px-4 py-2 font-semibold text-[#E1860E] hover:bg-[#EDF5FA]"
                   >
-                    ???? {t.logout}
+                    🚪 {t.logout}
                   </button>
                 </div>
               )}
