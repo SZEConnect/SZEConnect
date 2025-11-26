@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import cors from 'cors';
 import pool, { testConnection } from './database.js';
 import { sendWelcomeEmail} from './services/emailService.js';
+import { handleForgotPassword } from './forgotpassword.js';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -548,6 +549,11 @@ app.post("/login", async (req, res) => {
     res.status(500).json({ message: "Internal server error during login" });
   }
 });
+
+// --------------------
+// FORGOT PASSWORD ROUTE
+// --------------------
+app.post("/forgot-password", handleForgotPassword);
 
 // --------------------
 // PROTECTED PROFILE ROUTE (POSTGRESQL)
