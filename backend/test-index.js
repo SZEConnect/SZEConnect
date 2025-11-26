@@ -4,7 +4,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
 import pool, { testConnection } from './database.js';
-import { sendWelcomeEmail, testEmailConnection } from './services/emailService.js';
+import { sendWelcomeEmail} from './services/emailService.js';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
