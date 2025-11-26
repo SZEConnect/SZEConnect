@@ -5,29 +5,50 @@ import jwt from 'jsonwebtoken';
 import cors from 'cors';
 import pool, { testConnection } from './database.js';
 import { sendWelcomeEmail, testEmailConnection } from './services/emailService.js';
+import { handleForgotPassword } from './forgotpassword.js';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { v2 as cloudinary } from 'cloudinary';
+import streamifier from 'streamifier';
+dotenv.config();
+
+// --- CLOUDINARY KONFIGURÁCIÓ ---
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// --- SEGÉDFÜGGVÉNY A FELTÖLTÉSHEZ (EZ HIÁNYZOTT!) ---
+const uploadToCloudinary = (buffer, folder) => {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: folder,
+        resource_type: "auto", // Kép felismerése
+      },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result);
+      }
+    );
+    // A buffer átalakítása stream-mé
+    streamifier.createReadStream(buffer).pipe(uploadStream);
+  });
+};
 
 // Add this for ES modules __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config();
 
-// Add Multer configuration HERE
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, 'uploads')); // Use absolute path
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'post-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
+
+// ✅ HASZNÁLD EZT - memoryStorage Cloudinary-hoz
+const postStorage = multer.memoryStorage(); // ← Fájlok a memóriában
 
 const upload = multer({
-  storage: storage,
+  storage: postStorage, // ← memoryStorage!
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit
   },
@@ -75,7 +96,8 @@ app.get("/", (req, res) => {
       test: "GET /test-env",
       testDb: "GET /test-db",
       register: "POST /register",
-      login: "POST /login", 
+      login: "POST /login",
+      forgotPassword: "POST /forgot-password",
       profile: "GET /profile (requires auth)",
       users: "GET /users",
       groups: "GET /groups",
@@ -138,10 +160,26 @@ app.get("/test-db", async (req, res) => {
     });
   }
 });
+
+const profileStorage = multer.memoryStorage(); // Use memory storage for Cloudinary
+
+const uploadProfile = multer({
+  storage: profileStorage,
+  limits: {
+    fileSize: 2 * 1024 * 1024, // 2MB limit for profile pics
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'), false);
+    }
+  }
+});
 // --------------------
-// ENHANCED REGISTER ROUTE WITH NEW FIELDS + EMAIL
+// REGISTER ENDPOINT WITH CLOUDINARY PROFILE PICTURES - DEBUG VERSION
 // --------------------
-app.post("/register", async (req, res) => {
+app.post("/register", uploadProfile.single('profileImage'), async (req, res) => {
   try {
     const { 
       username, 
@@ -158,6 +196,13 @@ app.post("/register", async (req, res) => {
     } = req.body;
 
     console.log("📝 Registration attempt:", { username, email, neptun });
+    console.log("📸 Profile file details:", req.file ? {
+      originalname: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+      bufferLength: req.file.buffer?.length
+    } : 'No file received');
+    console.log("📦 Request body keys:", Object.keys(req.body));
 
     // === MANDATORY FIELD VALIDATION ===
     const mandatoryFields = { username, neptun, startYear, major, email, password, passwordAgain };
@@ -258,16 +303,49 @@ app.post("/register", async (req, res) => {
       });
     }
 
+    // === UPLOAD PROFILE PICTURE TO CLOUDINARY ===
+    let profileImageUrl = null;
+    if (req.file) {
+      try {
+        console.log("☁️ Uploading profile picture to Cloudinary...");
+        console.log("📊 File buffer exists:", !!req.file.buffer);
+        console.log("📊 File buffer length:", req.file.buffer?.length);
+        
+        const cloudinaryResult = await uploadToCloudinary(req.file.buffer, 'szeconnect-profiles');
+        profileImageUrl = cloudinaryResult.secure_url;
+        console.log("✅ Profile picture uploaded to Cloudinary:", profileImageUrl);
+        console.log("📝 Cloudinary result:", {
+          url: cloudinaryResult.secure_url,
+          public_id: cloudinaryResult.public_id,
+          format: cloudinaryResult.format
+        });
+      } catch (uploadError) {
+        console.error("❌ Cloudinary upload failed:", uploadError);
+        console.error("❌ Cloudinary error details:", {
+          message: uploadError.message,
+          stack: uploadError.stack
+        });
+        // Don't fail registration if image upload fails
+        console.log("⚠️ Continuing registration without profile picture");
+      }
+    } else {
+      console.log("ℹ️ No profile picture file provided");
+    }
+
+    console.log("💾 Final profileImageUrl to save:", profileImageUrl);
+
     // === HASH PASSWORD ===
     const hashedPassword = await bcrypt.hash(password, 12);
 
     // === SAVE USER TO DATABASE (POSTGRESQL) ===
     let result;
     try {
+      console.log("💾 Saving user to database with profile_picture_url:", profileImageUrl);
+      
       result = await pool.query(
         `INSERT INTO users 
-         (username, neptun_code, fullname, birthdate, gender, email, start_year, major, bio, password_hash)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+         (username, neptun_code, fullname, birthdate, gender, email, start_year, major, bio, password_hash, profile_picture_url)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
         [
           normalizedUsername,      // $1
           normalizedNeptun,        // $2  
@@ -278,11 +356,17 @@ app.post("/register", async (req, res) => {
           parseInt(startYear),     // $7
           normalizedMajor,         // $8
           normalizedBio,           // $9
-          hashedPassword           // $10
+          hashedPassword,          // $10
+          profileImageUrl          // $11 - Cloudinary URL or null
         ]
       );
 
-      console.log("✅ Database insert successful! New user:", result.rows[0]);
+      console.log("✅ Database insert successful! New user:", {
+        id: result.rows[0].user_id,
+        username: result.rows[0].username,
+        profile_picture_url: result.rows[0].profile_picture_url
+      });
+
     } catch (insertError) {
       console.error("❌ Database insert error:", insertError);
       console.error("❌ Insert query details:", {
@@ -290,7 +374,8 @@ app.post("/register", async (req, res) => {
         email: normalizedEmail,
         neptun: normalizedNeptun,
         startYear: parseInt(startYear),
-        major: normalizedMajor
+        major: normalizedMajor,
+        profileImageUrl: profileImageUrl
       });
       return res.status(500).json({ 
         success: false,
@@ -311,9 +396,16 @@ app.post("/register", async (req, res) => {
       fullName: result.rows[0].fullname,
       bio: result.rows[0].bio,
       gender: result.rows[0].gender,
+      profileImage: result.rows[0].profile_picture_url, // Cloudinary URL
       birthYear: result.rows[0].birthdate ? new Date(result.rows[0].birthdate).getFullYear() : null,
       createdAt: result.rows[0].created_at || new Date().toISOString()
     };
+
+    console.log("🎉 Final user object:", {
+      id: newUser.id,
+      username: newUser.username,
+      profileImage: newUser.profileImage
+    });
 
     // ========================
     // 🎉 EMAIL INTEGRATION
@@ -347,6 +439,7 @@ app.post("/register", async (req, res) => {
         bio: newUser.bio,
         gender: newUser.gender,
         birthYear: newUser.birthYear,
+        profileImage: newUser.profileImage, // Include Cloudinary URL
         createdAt: newUser.createdAt
       },
       emailSent: true
@@ -354,9 +447,48 @@ app.post("/register", async (req, res) => {
 
   } catch (error) {
     console.error("❌ Unexpected registration error:", error);
+    console.error("❌ Error stack:", error.stack);
     res.status(500).json({ 
       success: false,
       message: "Internal server error during registration",
+      error: error.message
+    });
+  }
+});
+
+// Add this endpoint to test Cloudinary directly
+app.post("/test-cloudinary", uploadProfile.single('testImage'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No file provided" });
+    }
+
+    console.log("🧪 Testing Cloudinary upload...");
+    console.log("File details:", {
+      originalname: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+      bufferLength: req.file.buffer?.length
+    });
+
+    const cloudinaryResult = await uploadToCloudinary(req.file.buffer, 'test-uploads');
+    
+    console.log("✅ Cloudinary upload successful:", cloudinaryResult.secure_url);
+    
+    res.json({
+      success: true,
+      message: "Cloudinary upload test successful",
+      result: {
+        url: cloudinaryResult.secure_url,
+        public_id: cloudinaryResult.public_id,
+        format: cloudinaryResult.format
+      }
+    });
+  } catch (error) {
+    console.error("❌ Cloudinary test failed:", error);
+    res.status(500).json({
+      success: false,
+      message: "Cloudinary upload test failed",
       error: error.message
     });
   }
@@ -420,6 +552,11 @@ app.post("/login", async (req, res) => {
 });
 
 // --------------------
+// FORGOT PASSWORD ROUTE
+// --------------------
+app.post("/forgot-password", handleForgotPassword);
+
+// --------------------
 // PROTECTED PROFILE ROUTE (POSTGRESQL)
 // --------------------
 app.get("/profile", async (req, res) => {
@@ -462,6 +599,7 @@ app.get("/profile", async (req, res) => {
         bio: user.bio,
         gender: user.gender,
         birthdate: user.birthdate,
+        profileImage: user.profile_picture_url,
         createdAt: user.created_at
       }
     });
@@ -1075,7 +1213,7 @@ app.post("/posts/:postId/comments", async (req, res) => {
 });
 
 // --------------------
-// POST CREATION ENDPOINT WITH IMAGES - FIXED
+// POST CREATION ENDPOINT WITH CLOUDINARY - FIXED
 // --------------------
 
 // Create a wrapper function to extract token before multer
@@ -1107,10 +1245,11 @@ const authenticateToken = (req, res, next) => {
 // Update the endpoint - authenticate FIRST, then multer
 app.post("/posts", authenticateToken, upload.array('images', 5), async (req, res) => {
   try {
-    const userId = req.user.id; // Now we get user from the authenticated request
+    const userId = req.user.id;
     const { title, content, groupId } = req.body;
 
     console.log("🔄 Creating post for user:", userId);
+    console.log("📸 Received files:", req.files?.length || 0);
 
     // Validation
     if (!title || title.trim() === '') {
@@ -1140,7 +1279,7 @@ app.post("/posts", authenticateToken, upload.array('images', 5), async (req, res
       });
     }
 
-    // Check if user exists (optional, since we already authenticated)
+    // Check if user exists
     const userResult = await pool.query(
       'SELECT * FROM users WHERE user_id = $1',
       [userId]
@@ -1153,11 +1292,41 @@ app.post("/posts", authenticateToken, upload.array('images', 5), async (req, res
       });
     }
 
-    // Handle multiple images - store as JSON array
+    // 🔄 CLOUDINARY IMAGE UPLOAD - FIXED VERSION
     let imageVideoUrl = null;
     if (req.files && req.files.length > 0) {
-      const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
-      imageVideoUrl = JSON.stringify(imageUrls);
+      console.log("☁️ Uploading post images to Cloudinary...");
+      console.log("📊 File details:", req.files.map(f => ({
+        originalname: f.originalname,
+        size: f.size,
+        mimetype: f.mimetype,
+        bufferLength: f.buffer?.length
+      })));
+      
+      try {
+        // Upload each image to Cloudinary
+        const uploadPromises = req.files.map(file => 
+          uploadToCloudinary(file.buffer, 'szeconnect-posts')
+        );
+        
+        const cloudinaryResults = await Promise.all(uploadPromises);
+        const imageUrls = cloudinaryResults.map(result => result.secure_url);
+        imageVideoUrl = JSON.stringify(imageUrls);
+        
+        console.log("✅ Post images uploaded to Cloudinary:", imageUrls);
+      } catch (uploadError) {
+        console.error("❌ Cloudinary upload failed:", uploadError);
+        // Option 1: Fail the entire post creation
+        return res.status(500).json({ 
+          success: false, 
+          message: "Failed to upload images to Cloudinary",
+          error: uploadError.message 
+        });
+        
+        // Option 2: Continue without images (uncomment if preferred)
+        // console.log("⚠️ Continuing post creation without images");
+        // imageVideoUrl = null;
+      }
     }
 
     // Insert the post with image_video field
@@ -1172,7 +1341,7 @@ app.post("/posts", authenticateToken, upload.array('images', 5), async (req, res
         title.trim(),
         content ? content.trim() : null,
         new Date(),
-        imageVideoUrl
+        imageVideoUrl  // Cloudinary URLs in JSON format
       ]
     );
 
@@ -1196,7 +1365,7 @@ app.post("/posts", authenticateToken, upload.array('images', 5), async (req, res
         authorName: user.username,
         groupId: groupId,
         group: group.group_name,
-        images: imageVideoUrl ? JSON.parse(imageVideoUrl) : []
+        images: imageVideoUrl ? JSON.parse(imageVideoUrl) : [] // Cloudinary URLs
       }
     });
     
@@ -1204,7 +1373,8 @@ app.post("/posts", authenticateToken, upload.array('images', 5), async (req, res
     console.error("❌ Error creating post:", error);
     res.status(500).json({ 
       success: false, 
-      message: "Failed to create post" 
+      message: "Failed to create post",
+      error: error.message 
     });
   }
 });
@@ -1483,6 +1653,85 @@ app.get("/search/users", async (req, res) => {
   }
 });
 // --------------------
+// GET USER PROFILE BY ID ENDPOINT
+// --------------------
+app.get("/users/:userId", async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    
+    if (!userId || isNaN(userId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid user ID" 
+      });
+    }
+
+    // Get user from PostgreSQL database
+    const result = await pool.query(
+      `SELECT 
+        user_id,
+        username,
+        email,
+        neptun_code,
+        fullname,
+        birthdate,
+        gender,
+        start_year,
+        major,
+        bio,
+        profile_picture_url,
+        created_at
+       FROM users 
+       WHERE user_id = $1`,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "User not found" 
+      });
+    }
+
+    const user = result.rows[0];
+    
+    // Parse fullname into first and last name
+    const nameParts = user.fullname ? user.fullname.split(' ') : [];
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    // Format response
+    const userProfile = {
+      id: user.user_id,
+      username: user.username,
+      email: user.email,
+      neptun: user.neptun_code,
+      fullName: user.fullname,
+      firstName: firstName,
+      lastName: lastName,
+      birthYear: user.birthdate ? new Date(user.birthdate).getFullYear() : null,
+      gender: user.gender,
+      startYear: user.start_year,
+      major: user.major,
+      bio: user.bio,
+      profileImage: user.profile_picture_url,
+      createdAt: user.created_at
+    };
+
+    res.json({
+      success: true,
+      user: userProfile
+    });
+
+  } catch (error) {
+    console.error("❌ Error fetching user profile:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to fetch user profile" 
+    });
+  }
+});
+// --------------------
 // DEV UTILITY ENDPOINTS
 // --------------------
 
@@ -1622,6 +1871,7 @@ app.use((req, res) => {
       testDb: "GET /test-db",
       register: "POST /register",
       login: "POST /login",
+      forgotPassword: "POST /forgot-password",
       profile: "GET /profile",
       users: "GET /users",
       groups: "GET /groups",
