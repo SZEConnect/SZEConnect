@@ -1804,6 +1804,7 @@ app.post('/dev/test-user', async (req, res) => {
 // --------------------
 // EMAIL TEST ENDPOINT
 // --------------------
+/*
 app.get('/test-email', async (req, res) => {
   try {
     // Test email configuration
@@ -1848,7 +1849,7 @@ app.get('/test-email', async (req, res) => {
     });
   }
 });
-
+*/
 // --------------------
 // 404 HANDLER (KEEP THIS LAST)
 // --------------------
