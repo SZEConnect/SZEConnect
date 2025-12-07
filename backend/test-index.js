@@ -1587,68 +1587,41 @@ app.get("/search/users", async (req, res) => {
   }
 });
 // --------------------
-// GET USER PROFILE BY ID ENDPOINT
+// GET USER PROFILE BY ID (SAFER VERSION)
 // --------------------
 app.get("/users/:userId", async (req, res) => {
   try {
     const userId = parseInt(req.params.userId);
     
     if (!userId || isNaN(userId)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid user ID" 
-      });
+      return res.status(400).json({ success: false, message: "Invalid user ID" });
     }
 
-    // Get user from PostgreSQL database
+    // ✅ FIX: Use SELECT * to prevent crashes if a specific column name is wrong
     const result = await pool.query(
-      `SELECT 
-        user_id,
-        username,
-        email,
-        neptun_code,
-        fullname,
-        birthdate,
-        gender,
-        start_year,
-        major,
-        bio,
-        profile_picture_url,
-        created_at
-       FROM users 
-       WHERE user_id = $1`,
+      'SELECT * FROM users WHERE user_id = $1',
       [userId]
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "User not found" 
-      });
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
     const user = result.rows[0];
     
-    // Parse fullname into first and last name
-    const nameParts = user.fullname ? user.fullname.split(' ') : [];
-    const firstName = nameParts[0] || '';
-    const lastName = nameParts.slice(1).join(' ') || '';
-
-    // Format response
+    // Format response (handle potential missing fields gracefully)
     const userProfile = {
       id: user.user_id,
       username: user.username,
       email: user.email,
       neptun: user.neptun_code,
-      fullName: user.fullname,
-      firstName: firstName,
-      lastName: lastName,
+      fullName: user.fullname || user.full_name, // Try both naming conventions
       birthYear: user.birthdate ? new Date(user.birthdate).getFullYear() : null,
       gender: user.gender,
       startYear: user.start_year,
       major: user.major,
       bio: user.bio,
-      profileImage: user.profile_picture_url,
+      profileImage: user.profile_picture_url || user.profile_image, // Try both
       createdAt: user.created_at
     };
 
@@ -1661,7 +1634,8 @@ app.get("/users/:userId", async (req, res) => {
     console.error("❌ Error fetching user profile:", error);
     res.status(500).json({ 
       success: false, 
-      message: "Failed to fetch user profile" 
+      message: "Failed to fetch user profile",
+      error: error.message 
     });
   }
 });
