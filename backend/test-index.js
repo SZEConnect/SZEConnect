@@ -4,8 +4,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
 import pool, { testConnection } from './database.js';
-import { sendWelcomeEmail} from './services/emailService.js';
-import { handleForgotPassword } from './forgotpassword.js';
+import { sendWelcomeEmail, testEmailConnection } from './services/emailService.js';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -176,7 +175,7 @@ const uploadProfile = multer({
   }
 });
 // --------------------
-// REGISTER ENDPOINT WITH CLOUDINARY PROFILE PICTURES - DEBUG VERSION
+// REGISTER ENDPOINT (FIXED: AUTO-LOGIN TOKEN INCLUDED)
 // --------------------
 app.post("/register", uploadProfile.single('profileImage'), async (req, res) => {
   try {
@@ -195,13 +194,6 @@ app.post("/register", uploadProfile.single('profileImage'), async (req, res) => 
     } = req.body;
 
     console.log("📝 Registration attempt:", { username, email, neptun });
-    console.log("📸 Profile file details:", req.file ? {
-      originalname: req.file.originalname,
-      size: req.file.size,
-      mimetype: req.file.mimetype,
-      bufferLength: req.file.buffer?.length
-    } : 'No file received');
-    console.log("📦 Request body keys:", Object.keys(req.body));
 
     // === MANDATORY FIELD VALIDATION ===
     const mandatoryFields = { username, neptun, startYear, major, email, password, passwordAgain };
@@ -239,14 +231,6 @@ app.post("/register", uploadProfile.single('profileImage'), async (req, res) => 
       return res.status(400).json({
         success: false,
         message: "Neptun code must be exactly 6 alphanumeric characters"
-      });
-    }
-
-    const currentYear = new Date().getFullYear();
-    if (startYear < 2000 || startYear > currentYear + 1) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid start year"
       });
     }
 
@@ -307,40 +291,21 @@ app.post("/register", uploadProfile.single('profileImage'), async (req, res) => 
     if (req.file) {
       try {
         console.log("☁️ Uploading profile picture to Cloudinary...");
-        console.log("📊 File buffer exists:", !!req.file.buffer);
-        console.log("📊 File buffer length:", req.file.buffer?.length);
-        
         const cloudinaryResult = await uploadToCloudinary(req.file.buffer, 'szeconnect-profiles');
         profileImageUrl = cloudinaryResult.secure_url;
-        console.log("✅ Profile picture uploaded to Cloudinary:", profileImageUrl);
-        console.log("📝 Cloudinary result:", {
-          url: cloudinaryResult.secure_url,
-          public_id: cloudinaryResult.public_id,
-          format: cloudinaryResult.format
-        });
+        console.log("✅ Profile picture uploaded:", profileImageUrl);
       } catch (uploadError) {
         console.error("❌ Cloudinary upload failed:", uploadError);
-        console.error("❌ Cloudinary error details:", {
-          message: uploadError.message,
-          stack: uploadError.stack
-        });
-        // Don't fail registration if image upload fails
-        console.log("⚠️ Continuing registration without profile picture");
+        // Continue registration even if image fails
       }
-    } else {
-      console.log("ℹ️ No profile picture file provided");
     }
-
-    console.log("💾 Final profileImageUrl to save:", profileImageUrl);
 
     // === HASH PASSWORD ===
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // === SAVE USER TO DATABASE (POSTGRESQL) ===
+    // === SAVE USER TO DATABASE ===
     let result;
     try {
-      console.log("💾 Saving user to database with profile_picture_url:", profileImageUrl);
-      
       result = await pool.query(
         `INSERT INTO users 
          (username, neptun_code, fullname, birthdate, gender, email, start_year, major, bio, password_hash, profile_picture_url)
@@ -356,35 +321,20 @@ app.post("/register", uploadProfile.single('profileImage'), async (req, res) => 
           normalizedMajor,         // $8
           normalizedBio,           // $9
           hashedPassword,          // $10
-          profileImageUrl          // $11 - Cloudinary URL or null
+          profileImageUrl          // $11
         ]
       );
 
-      console.log("✅ Database insert successful! New user:", {
-        id: result.rows[0].user_id,
-        username: result.rows[0].username,
-        profile_picture_url: result.rows[0].profile_picture_url
-      });
-
     } catch (insertError) {
       console.error("❌ Database insert error:", insertError);
-      console.error("❌ Insert query details:", {
-        username: normalizedUsername,
-        email: normalizedEmail,
-        neptun: normalizedNeptun,
-        startYear: parseInt(startYear),
-        major: normalizedMajor,
-        profileImageUrl: profileImageUrl
-      });
       return res.status(500).json({ 
         success: false,
         message: "Database error during user creation",
-        error: insertError.message,
-        code: insertError.code
+        error: insertError.message
       });
     }
 
-    // === CREATE USER OBJECT FOR EMAIL ===
+    // === CREATE USER OBJECT ===
     const newUser = { 
       id: result.rows[0].user_id,
       username: result.rows[0].username,
@@ -395,38 +345,31 @@ app.post("/register", uploadProfile.single('profileImage'), async (req, res) => 
       fullName: result.rows[0].fullname,
       bio: result.rows[0].bio,
       gender: result.rows[0].gender,
-      profileImage: result.rows[0].profile_picture_url, // Cloudinary URL
-      birthYear: result.rows[0].birthdate ? new Date(result.rows[0].birthdate).getFullYear() : null,
-      createdAt: result.rows[0].created_at || new Date().toISOString()
+      profileImage: result.rows[0].profile_picture_url,
+      createdAt: result.rows[0].created_at
     };
 
-    console.log("🎉 Final user object:", {
-      id: newUser.id,
-      username: newUser.username,
-      profileImage: newUser.profileImage
-    });
+    // ==========================================
+    // 🔐 GENERATE TOKEN (AUTO-LOGIN FIX)
+    // ==========================================
+    const token = jwt.sign(
+      { 
+        id: newUser.id,
+        username: newUser.username,
+        neptun: newUser.neptun 
+      },
+      secret,
+      { expiresIn: "24h" } // Increased validity time slightly
+    );
 
-    // ========================
-    // 🎉 EMAIL INTEGRATION
-    // ========================
-    // Send welcome email ASYNCHRONOUSLY (don't wait for it)
-    sendWelcomeEmail(newUser)
-      .then(emailResult => {
-        if (emailResult && emailResult.success) {
-          console.log(`📧 Welcome email sent to ${newUser.email}`);
-          console.log(`📨 Message ID: ${emailResult.messageId}`);
-        } else {
-          console.log(`⚠️  Email failed for ${newUser.email}:`, emailResult?.error || 'Unknown error');
-        }
-      })
-      .catch(emailError => {
-        console.log(`⚠️  Email error for ${newUser.email}: ${emailError.message}`);
-      });
+    // === SEND EMAIL (Async) ===
+    sendWelcomeEmail(newUser).catch(err => console.log("Email error:", err.message));
 
-    // === SUCCESS RESPONSE ===
+    // === SUCCESS RESPONSE WITH TOKEN ===
     res.status(201).json({ 
       success: true,
-      message: "User registered successfully", 
+      message: "User registered successfully",
+      token: token, // <--- CRITICAL FOR AUTO-LOGIN
       user: {
         id: newUser.id,
         username: newUser.username,
@@ -437,8 +380,7 @@ app.post("/register", uploadProfile.single('profileImage'), async (req, res) => 
         fullName: newUser.fullName,
         bio: newUser.bio,
         gender: newUser.gender,
-        birthYear: newUser.birthYear,
-        profileImage: newUser.profileImage, // Include Cloudinary URL
+        profileImage: newUser.profileImage,
         createdAt: newUser.createdAt
       },
       emailSent: true
@@ -446,7 +388,6 @@ app.post("/register", uploadProfile.single('profileImage'), async (req, res) => 
 
   } catch (error) {
     console.error("❌ Unexpected registration error:", error);
-    console.error("❌ Error stack:", error.stack);
     res.status(500).json({ 
       success: false,
       message: "Internal server error during registration",
@@ -454,7 +395,6 @@ app.post("/register", uploadProfile.single('profileImage'), async (req, res) => 
     });
   }
 });
-
 // Add this endpoint to test Cloudinary directly
 app.post("/test-cloudinary", uploadProfile.single('testImage'), async (req, res) => {
   try {
@@ -549,11 +489,6 @@ app.post("/login", async (req, res) => {
     res.status(500).json({ message: "Internal server error during login" });
   }
 });
-
-// --------------------
-// FORGOT PASSWORD ROUTE
-// --------------------
-app.post("/forgot-password", handleForgotPassword);
 
 // --------------------
 // PROTECTED PROFILE ROUTE (POSTGRESQL)
@@ -1914,6 +1849,7 @@ app.listen(PORT, async () => {
   console.log(`🌐 Server running on port ${PORT}`);
   console.log('='.repeat(60));
   
+
 
 });
 
