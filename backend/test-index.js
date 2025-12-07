@@ -1665,6 +1665,60 @@ app.get("/users/:userId", async (req, res) => {
     });
   }
 });
+
+// --------------------
+// GET POSTS BY USER ID
+// --------------------
+app.get("/users/:userId/posts", async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    
+    // Query posts where user_id matches the requested profile
+    const result = await pool.query(`
+      SELECT 
+        p.post_id,
+        p.title,
+        p.content,
+        p.post_date,
+        p.user_id,
+        p.group_id,
+        p.image_video,
+        u.username,
+        u.major,
+        g.group_name
+      FROM posts p
+      LEFT JOIN users u ON p.user_id = u.user_id
+      LEFT JOIN groupok g ON p.group_id = g.group_id
+      WHERE p.user_id = $1
+      ORDER BY p.post_date DESC
+    `, [userId]);
+
+    res.json({
+      success: true,
+      total: result.rows.length,
+      posts: result.rows.map(post => ({
+        id: post.post_id,
+        title: post.title,
+        content: post.content,
+        time: post.post_date,
+        authorId: post.user_id,
+        authorName: post.username,
+        groupId: post.group_id,
+        group: post.group_name,
+        major: post.major,
+        images: post.image_video ? JSON.parse(post.image_video) : [],
+        hasImages: !!post.image_video
+      }))
+    });
+
+  } catch (error) {
+    console.error("❌ Error fetching user posts:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to fetch user posts" 
+    });
+  }
+});
 // --------------------
 // DEV UTILITY ENDPOINTS
 // --------------------
