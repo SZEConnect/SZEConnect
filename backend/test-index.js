@@ -1019,6 +1019,9 @@ app.post("/groups", authenticateToken, upload.single('image'), async (req, res) 
 // --------------------
 // POSTS ENDPOINTS
 // --------------------
+// --------------------
+// POSTS ENDPOINTS
+// --------------------
 app.get("/posts", async (req, res) => {
   try {
     const result = await pool.query(`
@@ -1032,6 +1035,7 @@ app.get("/posts", async (req, res) => {
         p.image_video,
         u.username,
         u.major,
+        u.profile_picture_url,  -- ✅ ADDED: Get author's profile picture
         g.group_name
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.user_id
@@ -1049,11 +1053,12 @@ app.get("/posts", async (req, res) => {
         time: post.post_date,
         authorId: post.user_id,
         authorName: post.username,
+        authorImage: post.profile_picture_url, // ✅ ADDED: Send it to frontend
         groupId: post.group_id,
         group: post.group_name,
         major: post.major,
         images: post.image_video ? JSON.parse(post.image_video) : [],
-         hasImages: !!post.image_video
+        hasImages: !!post.image_video
       }))
     });
 
