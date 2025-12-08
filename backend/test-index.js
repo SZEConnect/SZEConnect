@@ -1567,7 +1567,53 @@ app.post("/posts/:postId/like", async (req, res) => {
 // --------------------
 
 // 1. Fetch Groups
+app.get("/search/groups", async (req, res) => {
+  try {
+    const { q } = req.query;
+    
+    if (!q || q.trim() === '') {
+      return res.json({
+        success: true,
+        groups: []
+      });
+    }
 
+    const searchTerm = `%${q.trim()}%`;
+    
+    // Search groups by name or description
+    const result = await pool.query(`
+      SELECT 
+        g.group_id, 
+        g.group_name, 
+        g.description,
+        g.image_url, 
+        COUNT(f.user_id) as member_count
+      FROM groupok g 
+      LEFT JOIN followings f ON g.group_id = f.group_id
+      WHERE g.group_name ILIKE $1 OR g.description ILIKE $1
+      GROUP BY g.group_id
+      ORDER BY g.group_name
+    `, [searchTerm]);
+
+    res.json({
+      success: true,
+      groups: result.rows.map(g => ({
+        id: g.group_id,
+        name: g.group_name,
+        description: g.description,
+        imageUrl: g.image_url,
+        memberCount: parseInt(g.member_count) || 0
+      }))
+    });
+
+  } catch (error) {
+    console.error("❌ Error searching groups:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to search groups" 
+    });
+  }
+});
 
 // Search users
 app.get("/search/users", async (req, res) => {
