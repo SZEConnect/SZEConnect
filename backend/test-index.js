@@ -574,24 +574,55 @@ app.get("/profile", async (req, res) => {
   }
 });
 
-app.post("/profile", authenticateToken, uploadProfile.single('profileImage'), async (req, res) => {
+app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), async (req, res) => {
   const client = await pool.connect();
   
   try {
     const userId = req.user.id;
-    const { username, bio, password, interests } = req.body;
-
+    
+    // ===========================================
+    // CRITICAL FIX: Multer doesn't parse text fields automatically
+    // We need to parse them from req.body
+    // ===========================================
+    console.log("📨 Received profile update request");
+    console.log("🔍 Checking req.body:", req.body);
+    console.log("🔍 Checking req.file:", req.file ? `Yes - ${req.file.originalname}` : "No");
+    console.log("🔍 Checking req.headers content-type:", req.headers['content-type']);
+    
+    // Extract fields - multer should put text fields in req.body
+    // But sometimes they come as strings that need parsing
+    let username, bio, password, interests;
+    
+    if (typeof req.body === 'object' && req.body !== null) {
+      username = req.body.username;
+      bio = req.body.bio;
+      password = req.body.password;
+      interests = req.body.interests;
+    } else if (typeof req.body === 'string') {
+      // Try to parse as JSON (if frontend sends JSON instead of FormData)
+      try {
+        const parsed = JSON.parse(req.body);
+        username = parsed.username;
+        bio = parsed.bio;
+        password = parsed.password;
+        interests = parsed.interests;
+      } catch (e) {
+        console.log("Could not parse req.body as JSON:", e.message);
+      }
+    }
+    
     console.log(`🔄 Updating profile for user ${userId}`);
-    console.log("Received data:", { username, bio, password: password ? "***" : "not provided", interests });
+    console.log("📋 Extracted fields:", { username, bio, password: password ? "***" : "not provided", interests });
 
     // ===========================================
     // 1. VALIDATION
     // ===========================================
     
     // Username validation if provided
-    if (username) {
+    if (username !== undefined && username !== null) {
       const trimmedUsername = username.trim();
       if (trimmedUsername.length < 3) {
+        client.release();
         return res.status(400).json({ 
           success: false, 
           message: "Username must be at least 3 characters long" 
@@ -605,6 +636,7 @@ app.post("/profile", authenticateToken, uploadProfile.single('profileImage'), as
       );
       
       if (usernameCheck.rows.length > 0) {
+        client.release();
         return res.status(400).json({ 
           success: false, 
           message: "Username already taken" 
@@ -616,6 +648,7 @@ app.post("/profile", authenticateToken, uploadProfile.single('profileImage'), as
     let passwordHash = null;
     if (password && password.trim() !== "") {
       if (password.length < 6) {
+        client.release();
         return res.status(400).json({ 
           success: false, 
           message: "Password must be at least 6 characters" 
@@ -635,7 +668,8 @@ app.post("/profile", authenticateToken, uploadProfile.single('profileImage'), as
         console.log("File details:", {
           originalname: req.file.originalname,
           size: req.file.size,
-          mimetype: req.file.mimetype
+          mimetype: req.file.mimetype,
+          fieldname: req.file.fieldname
         });
         
         const cloudinaryResult = await uploadToCloudinary(req.file.buffer, 'szeconnect-profiles');
@@ -643,10 +677,7 @@ app.post("/profile", authenticateToken, uploadProfile.single('profileImage'), as
         console.log("✅ Profile image uploaded:", profileImageUrl);
       } catch (uploadError) {
         console.error("❌ Cloudinary upload failed:", uploadError);
-        return res.status(500).json({ 
-          success: false, 
-          message: "Failed to upload profile image" 
-        });
+        // Don't fail the entire update if image upload fails
       }
     }
 
@@ -657,14 +688,14 @@ app.post("/profile", authenticateToken, uploadProfile.single('profileImage'), as
     const values = [];
     let paramCounter = 1;
 
-    if (username) {
+    if (username !== undefined && username !== null && username.trim() !== "") {
       updates.push(`username = $${paramCounter++}`);
       values.push(username.trim());
     }
     
-    if (bio !== undefined) {
+    if (bio !== undefined && bio !== null) {
       updates.push(`bio = $${paramCounter++}`);
-      values.push(bio ? bio.trim() : null); // Allow null for empty bio
+      values.push(bio.trim() || null); // Allow null for empty bio
     }
     
     if (passwordHash) {
@@ -677,8 +708,8 @@ app.post("/profile", authenticateToken, uploadProfile.single('profileImage'), as
       values.push(profileImageUrl);
     }
     
-    // If you want to support interests in the future:
-    // if (interests !== undefined) {
+    // Handle interests if you want to save them
+    // if (interests !== undefined && interests !== null) {
     //   updates.push(`interests = $${paramCounter++}`);
     //   values.push(interests);
     // }
@@ -736,6 +767,11 @@ app.post("/profile", authenticateToken, uploadProfile.single('profileImage'), as
     const updatedUser = result.rows[0];
 
     console.log(`✅ Profile updated for user ${userId}`);
+    console.log("📊 Updated user data:", {
+      username: updatedUser.username,
+      bio: updatedUser.bio,
+      profileImage: updatedUser.profile_picture_url
+    });
 
     res.json({
       success: true,
@@ -762,11 +798,18 @@ app.post("/profile", authenticateToken, uploadProfile.single('profileImage'), as
     console.error("Error message:", error.message);
     console.error("Error code:", error.code);
     console.error("Error detail:", error.detail);
+    console.error("Full error:", error);
     
     if (error.code === '23505') { // Unique violation
       res.status(400).json({ 
         success: false, 
         message: "Username already taken by another user" 
+      });
+    } else if (error.code === '42703') { // Undefined column
+      res.status(500).json({ 
+        success: false, 
+        message: "Database column error - check if 'bio' column exists",
+        hint: "Run: ALTER TABLE users ADD COLUMN bio TEXT;"
       });
     } else {
       res.status(500).json({ 
