@@ -504,7 +504,8 @@ app.post("/login", async (req, res) => {
         email: user.email,
         neptun: user.neptun_code,
         major: user.major,
-        start_year: user.start_year
+        start_year: user.start_year,
+        profileImage: user.profile_picture_url
       }
     });
 
@@ -1853,6 +1854,51 @@ app.get('/test-email', async (req, res) => {
   }
 });
 */
+
+// --------------------
+// STATUS ENDPOINT (for frontend testing)
+// --------------------
+app.get("/status", async (req, res) => {
+  try {
+    // Test database connection
+    const dbResult = await pool.query('SELECT NOW() as db_time');
+    
+    res.json({
+      success: true,
+      message: "SzeConnect Backend is running!",
+      services: {
+        database: "Connected",
+        server: "Running", 
+        api: "Ready for frontend connections",
+        connection: process.env.DATABASE_URL ? "Internal URL" : "External URL"
+      },
+      database: {
+        time: dbResult.rows[0].db_time,
+        connection: process.env.DATABASE_URL ? "Internal" : "External",
+        ssl: process.env.DATABASE_URL ? "Disabled" : "Enabled"
+      },
+      api: {
+        baseUrl: "https://szeconnect.onrender.com",
+        frontendInstructions: "Your friend can connect their frontend to this URL",
+        exampleEndpoints: [
+          "GET /status",
+          "POST /register", 
+          "POST /login",
+          "GET /groups",
+          "GET /users"
+        ]
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Backend running but database connection failed",
+      error: error.message,
+      connection: process.env.DATABASE_URL ? "Internal URL" : "External URL"
+    });
+  }
+});
 // --------------------
 // 404 HANDLER (KEEP THIS LAST)
 // --------------------
@@ -1915,47 +1961,3 @@ app.listen(PORT, async () => {
 
 });
 
-// --------------------
-// STATUS ENDPOINT (for frontend testing)
-// --------------------
-app.get("/status", async (req, res) => {
-  try {
-    // Test database connection
-    const dbResult = await pool.query('SELECT NOW() as db_time');
-    
-    res.json({
-      success: true,
-      message: "SzeConnect Backend is running!",
-      services: {
-        database: "Connected",
-        server: "Running", 
-        api: "Ready for frontend connections",
-        connection: process.env.DATABASE_URL ? "Internal URL" : "External URL"
-      },
-      database: {
-        time: dbResult.rows[0].db_time,
-        connection: process.env.DATABASE_URL ? "Internal" : "External",
-        ssl: process.env.DATABASE_URL ? "Disabled" : "Enabled"
-      },
-      api: {
-        baseUrl: "https://szeconnect.onrender.com",
-        frontendInstructions: "Your friend can connect their frontend to this URL",
-        exampleEndpoints: [
-          "GET /status",
-          "POST /register", 
-          "POST /login",
-          "GET /groups",
-          "GET /users"
-        ]
-      },
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Backend running but database connection failed",
-      error: error.message,
-      connection: process.env.DATABASE_URL ? "Internal URL" : "External URL"
-    });
-  }
-});
