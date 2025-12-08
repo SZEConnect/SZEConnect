@@ -574,39 +574,85 @@ app.get("/profile", async (req, res) => {
   }
 });
 
-// --------------------
-// UPDATE PROFILE ENDPOINT
-// --------------------
 app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), async (req, res) => {
   const client = await pool.connect();
+  
   try {
     const userId = req.user.id;
     const { username, bio, password, interests } = req.body;
 
     console.log(`🔄 Updating profile for user ${userId}`);
+    console.log("Received data:", { username, bio, password: password ? "***" : "not provided", interests });
 
-    // 1. Handle Password Update (if provided)
+    // ===========================================
+    // 1. VALIDATION
+    // ===========================================
+    
+    // Username validation if provided
+    if (username) {
+      const trimmedUsername = username.trim();
+      if (trimmedUsername.length < 3) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Username must be at least 3 characters long" 
+        });
+      }
+      
+      // Check if username is already taken by another user
+      const usernameCheck = await client.query(
+        'SELECT user_id FROM users WHERE username = $1 AND user_id != $2',
+        [trimmedUsername, userId]
+      );
+      
+      if (usernameCheck.rows.length > 0) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Username already taken" 
+        });
+      }
+    }
+
+    // Password validation if provided
     let passwordHash = null;
     if (password && password.trim() !== "") {
       if (password.length < 6) {
-        return res.status(400).json({ success: false, message: "Password must be at least 6 characters" });
+        return res.status(400).json({ 
+          success: false, 
+          message: "Password must be at least 6 characters" 
+        });
       }
       passwordHash = await bcrypt.hash(password, 12);
+      console.log("✅ Password hash generated");
     }
 
-    // 2. Handle Image Upload (if provided)
+    // ===========================================
+    // 2. IMAGE UPLOAD
+    // ===========================================
     let profileImageUrl = null;
     if (req.file) {
       try {
+        console.log("☁️ Uploading profile picture to Cloudinary...");
+        console.log("File details:", {
+          originalname: req.file.originalname,
+          size: req.file.size,
+          mimetype: req.file.mimetype
+        });
+        
         const cloudinaryResult = await uploadToCloudinary(req.file.buffer, 'szeconnect-profiles');
         profileImageUrl = cloudinaryResult.secure_url;
+        console.log("✅ Profile image uploaded:", profileImageUrl);
       } catch (uploadError) {
         console.error("❌ Cloudinary upload failed:", uploadError);
+        return res.status(500).json({ 
+          success: false, 
+          message: "Failed to upload profile image" 
+        });
       }
     }
 
-    // 3. Build Dynamic SQL Query
-    // We only update fields that were actually sent
+    // ===========================================
+    // 3. BUILD DYNAMIC SQL QUERY
+    // ===========================================
     const updates = [];
     const values = [];
     let paramCounter = 1;
@@ -615,36 +661,81 @@ app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), asy
       updates.push(`username = $${paramCounter++}`);
       values.push(username.trim());
     }
+    
     if (bio !== undefined) {
       updates.push(`bio = $${paramCounter++}`);
-      values.push(bio.trim());
+      values.push(bio ? bio.trim() : null); // Allow null for empty bio
     }
+    
     if (passwordHash) {
       updates.push(`password_hash = $${paramCounter++}`);
       values.push(passwordHash);
     }
+    
     if (profileImageUrl) {
       updates.push(`profile_picture_url = $${paramCounter++}`);
       values.push(profileImageUrl);
     }
-
-    // Note: 'interests' are not currently in your database schema, 
-    // so we aren't saving them here to prevent errors.
+    
+    // If you want to support interests in the future:
+    // if (interests !== undefined) {
+    //   updates.push(`interests = $${paramCounter++}`);
+    //   values.push(interests);
+    // }
 
     if (updates.length === 0) {
-      return res.json({ success: true, message: "No changes to save" });
+      console.log("ℹ️ No changes to save");
+      client.release();
+      return res.json({ 
+        success: true, 
+        message: "No changes to save" 
+      });
     }
 
-    values.push(userId); // Add userId as the last parameter
+    // Add updated_at timestamp
+    updates.push(`updated_at = NOW()`);
+
+    // Add userId as the last parameter
+    values.push(userId);
+    
     const query = `
       UPDATE users 
       SET ${updates.join(", ")} 
       WHERE user_id = $${paramCounter} 
-      RETURNING user_id, username, email, bio, profile_picture_url
+      RETURNING 
+        user_id, 
+        username, 
+        email, 
+        bio, 
+        profile_picture_url,
+        fullname,
+        gender,
+        birthdate,
+        neptun_code,
+        major,
+        start_year,
+        created_at
     `;
 
+    console.log("📝 SQL Query:", query);
+    console.log("📋 Query values:", values);
+
+    // ===========================================
+    // 4. EXECUTE UPDATE
+    // ===========================================
     const result = await client.query(query, values);
+    
+    if (result.rows.length === 0) {
+      client.release();
+      return res.status(404).json({ 
+        success: false, 
+        message: "User not found" 
+      });
+    }
+
     const updatedUser = result.rows[0];
+
+    console.log(`✅ Profile updated for user ${userId}`);
 
     res.json({
       success: true,
@@ -654,17 +745,37 @@ app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), asy
         username: updatedUser.username,
         email: updatedUser.email,
         bio: updatedUser.bio,
-        profileImage: updatedUser.profile_picture_url
+        profileImage: updatedUser.profile_picture_url,
+        fullName: updatedUser.fullname,
+        gender: updatedUser.gender,
+        birthdate: updatedUser.birthdate,
+        neptun: updatedUser.neptun_code,
+        major: updatedUser.major,
+        startYear: updatedUser.start_year,
+        createdAt: updatedUser.created_at
       }
     });
 
   } catch (error) {
-    console.error("❌ Error updating profile:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Failed to update profile",
-      error: error.message 
-    });
+    console.error("❌❌❌ Error updating profile:");
+    console.error("Error name:", error.name);
+    console.error("Error message:", error.message);
+    console.error("Error code:", error.code);
+    console.error("Error detail:", error.detail);
+    
+    if (error.code === '23505') { // Unique violation
+      res.status(400).json({ 
+        success: false, 
+        message: "Username already taken by another user" 
+      });
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to update profile",
+        error: error.message,
+        errorCode: error.code
+      });
+    }
   } finally {
     client.release();
   }
