@@ -574,7 +574,7 @@ app.get("/profile", async (req, res) => {
   }
 });
 
-app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), async (req, res) => {
+app.post("/profile", authenticateToken, uploadProfile.single('profileImage'), async (req, res) => {
   const client = await pool.connect();
   
   try {
