@@ -915,7 +915,84 @@ app.get("/groups/:groupId/following", async (req, res) => {
     });
   }
 });
+// --------------------
+// CREATE GROUP ENDPOINT (UPDATED FOR 'image_url' COLUMN)
+// --------------------
+app.post("/groups", authenticateToken, upload.single('image'), async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { name, description } = req.body;
+    const userId = req.user.id;
 
+    if (!name || name.trim() === "") {
+      return res.status(400).json({ success: false, message: "Group name is required" });
+    }
+
+    // 🔄 CLOUDINARY UPLOAD
+    let groupImageUrl = null;
+    if (req.file) {
+      try {
+        console.log("☁️ Uploading group image to Cloudinary...");
+        const cloudinaryResult = await uploadToCloudinary(req.file.buffer, 'szeconnect-groups');
+        groupImageUrl = cloudinaryResult.secure_url;
+        console.log("✅ Group image uploaded:", groupImageUrl);
+      } catch (uploadError) {
+        console.error("❌ Cloudinary upload failed:", uploadError);
+      }
+    }
+
+    // Start transaction
+    await client.query('BEGIN');
+
+    // 1. Insert new group using the correct column 'image_url'
+    const groupResult = await client.query(
+      `INSERT INTO groupok (group_name, description, creator_id, image_url, created_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       RETURNING *`,
+      [
+        name.trim(), 
+        description ? description.trim() : null, 
+        userId,
+        groupImageUrl // Saves the URL to the 'image_url' column
+      ]
+    );
+
+    const newGroup = groupResult.rows[0];
+
+    // 2. Automatically make creator a member
+    await client.query(
+      `INSERT INTO followings (user_id, group_id) VALUES ($1, $2)`,
+      [userId, newGroup.group_id]
+    );
+
+    await client.query('COMMIT');
+
+    console.log(`✅ User ${userId} created group "${newGroup.group_name}"`);
+
+    res.status(201).json({
+      success: true,
+      message: "Group created successfully",
+      group: {
+        id: newGroup.group_id,
+        name: newGroup.group_name,
+        description: newGroup.description,
+        imageUrl: newGroup.image_url, // Send back the correct field
+        creatorId: userId
+      }
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error("❌ Error creating group:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to create group",
+      error: error.message 
+    });
+  } finally {
+    client.release();
+  }
+});
 // --------------------
 // POSTS ENDPOINTS
 // --------------------
