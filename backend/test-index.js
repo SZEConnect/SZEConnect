@@ -657,10 +657,12 @@ app.get("/groups", async (req, res) => {
 });
 
 // Get a specific group by ID
+// Get a specific group by ID
 app.get("/groups/:groupId", async (req, res) => {
   try {
     const groupId = parseInt(req.params.groupId);
     
+    // ✅ Query includes g.* so image_url is fetched
     const groupResult = await pool.query(
       `SELECT g.*, u.username as creator_name 
        FROM groupok g 
@@ -680,7 +682,7 @@ app.get("/groups/:groupId", async (req, res) => {
 
     // Get members of this group
     const membersResult = await pool.query(
-      `SELECT u.user_id, u.username, u.major, u.start_year 
+      `SELECT u.user_id, u.username, u.major, u.start_year, u.profile_picture_url 
        FROM followings f
        JOIN users u ON f.user_id = u.user_id
        WHERE f.group_id = $1`,
@@ -694,9 +696,14 @@ app.get("/groups/:groupId", async (req, res) => {
         name: group.group_name,
         description: group.description,
         creator: group.creator_name,
+        // ✅ ADD THIS LINE (This was missing!):
+        imageUrl: group.image_url, 
         memberCount: membersResult.rows.length,
         createdAt: group.created_at,
-        members: membersResult.rows
+        members: membersResult.rows.map(m => ({
+            ...m,
+            profileImage: m.profile_picture_url // Optional: also send member avatars
+        }))
       }
     });
 
