@@ -1561,33 +1561,7 @@ app.post("/posts/:postId/like", async (req, res) => {
 // --------------------
 
 // 1. Fetch Groups
-  useEffect(() => {
-    const fetchGroups = async () => {
-      try {
-        setLoading(true);
-        const token = localStorage.getItem("token");
-        const response = await api.listGroups(token);
-        const groupsData = response.groups || [];
-        
-        const transformedGroups = groupsData.map(group => ({
-          id: group.id,
-          name: group.name,
-          count: group.postCount || group.memberCount || 0,
-          description: group.description,
-          imageUrl: group.imageUrl // ✅ Capture the image URL
-        }));
-        
-        setGroups(transformedGroups);
-      } catch (err) {
-        setError(err.message);
-        console.error("Failed to fetch groups:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
 
-    fetchGroups();
-  }, []);
 
 // Search users
 app.get("/search/users", async (req, res) => {
