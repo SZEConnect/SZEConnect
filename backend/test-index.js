@@ -85,6 +85,34 @@ app.use('/uploads', express.static('uploads'));
 const PORT = process.env.PORT || 4000;
 const secret = process.env.JWT_SECRET;
 
+// ====================
+// AUTHENTICATION MIDDLEWARE
+// ====================
+const authenticateToken = (req, res, next) => {
+  try {
+    const authHeader = req.headers["authorization"];
+    if (!authHeader) {
+      return res.status(401).json({ 
+        success: false, 
+        message: "Authorization token required" 
+      });
+    }
+
+    const token = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : authHeader;
+    
+    // Verify the token immediately
+    const decoded = jwt.verify(token, secret);
+    req.user = decoded; // Attach user to request
+    next();
+  } catch (error) {
+    console.error("❌ JWT verification failed:", error.message);
+    return res.status(403).json({ 
+      success: false, 
+      message: "Invalid or expired token" 
+    });
+  }
+};
+
 // --------------------
 // ROOT ROUTE
 // --------------------
@@ -1226,32 +1254,6 @@ app.post("/posts/:postId/comments", async (req, res) => {
 // --------------------
 // POST CREATION ENDPOINT WITH CLOUDINARY - FIXED
 // --------------------
-
-// Create a wrapper function to extract token before multer
-const authenticateToken = (req, res, next) => {
-  try {
-    const authHeader = req.headers["authorization"];
-    if (!authHeader) {
-      return res.status(401).json({ 
-        success: false, 
-        message: "Authorization token required" 
-      });
-    }
-
-    const token = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : authHeader;
-    
-    // Verify the token immediately
-    const decoded = jwt.verify(token, secret);
-    req.user = decoded; // Attach user to request
-    next();
-  } catch (error) {
-    console.error("❌ JWT verification failed:", error.message);
-    return res.status(403).json({ 
-      success: false, 
-      message: "Invalid or expired token" 
-    });
-  }
-};
 
 // Update the endpoint - authenticate FIRST, then multer
 app.post("/posts", authenticateToken, upload.array('images', 5), async (req, res) => {
