@@ -575,6 +575,101 @@ app.get("/profile", async (req, res) => {
 });
 
 // --------------------
+// UPDATE PROFILE ENDPOINT
+// --------------------
+app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const userId = req.user.id;
+    const { username, bio, password, interests } = req.body;
+
+    console.log(`🔄 Updating profile for user ${userId}`);
+
+    // 1. Handle Password Update (if provided)
+    let passwordHash = null;
+    if (password && password.trim() !== "") {
+      if (password.length < 6) {
+        return res.status(400).json({ success: false, message: "Password must be at least 6 characters" });
+      }
+      passwordHash = await bcrypt.hash(password, 12);
+    }
+
+    // 2. Handle Image Upload (if provided)
+    let profileImageUrl = null;
+    if (req.file) {
+      try {
+        const cloudinaryResult = await uploadToCloudinary(req.file.buffer, 'szeconnect-profiles');
+        profileImageUrl = cloudinaryResult.secure_url;
+      } catch (uploadError) {
+        console.error("❌ Cloudinary upload failed:", uploadError);
+      }
+    }
+
+    // 3. Build Dynamic SQL Query
+    // We only update fields that were actually sent
+    const updates = [];
+    const values = [];
+    let paramCounter = 1;
+
+    if (username) {
+      updates.push(`username = $${paramCounter++}`);
+      values.push(username.trim());
+    }
+    if (bio !== undefined) {
+      updates.push(`bio = $${paramCounter++}`);
+      values.push(bio.trim());
+    }
+    if (passwordHash) {
+      updates.push(`password_hash = $${paramCounter++}`);
+      values.push(passwordHash);
+    }
+    if (profileImageUrl) {
+      updates.push(`profile_picture_url = $${paramCounter++}`);
+      values.push(profileImageUrl);
+    }
+
+    // Note: 'interests' are not currently in your database schema, 
+    // so we aren't saving them here to prevent errors.
+
+    if (updates.length === 0) {
+      return res.json({ success: true, message: "No changes to save" });
+    }
+
+    values.push(userId); // Add userId as the last parameter
+    const query = `
+      UPDATE users 
+      SET ${updates.join(", ")} 
+      WHERE user_id = $${paramCounter} 
+      RETURNING user_id, username, email, bio, profile_picture_url
+    `;
+
+    const result = await client.query(query, values);
+    const updatedUser = result.rows[0];
+
+    res.json({
+      success: true,
+      message: "Profile updated successfully",
+      user: {
+        id: updatedUser.user_id,
+        username: updatedUser.username,
+        email: updatedUser.email,
+        bio: updatedUser.bio,
+        profileImage: updatedUser.profile_picture_url
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error updating profile:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to update profile",
+      error: error.message 
+    });
+  } finally {
+    client.release();
+  }
+});
+// --------------------
 // USERS LIST (POSTGRESQL)
 // --------------------
 app.get("/users", async (req, res) => {
