@@ -85,34 +85,6 @@ app.use('/uploads', express.static('uploads'));
 const PORT = process.env.PORT || 4000;
 const secret = process.env.JWT_SECRET;
 
-// ====================
-// AUTHENTICATION MIDDLEWARE
-// ====================
-const authenticateToken = (req, res, next) => {
-  try {
-    const authHeader = req.headers["authorization"];
-    if (!authHeader) {
-      return res.status(401).json({ 
-        success: false, 
-        message: "Authorization token required" 
-      });
-    }
-
-    const token = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : authHeader;
-    
-    // Verify the token immediately
-    const decoded = jwt.verify(token, secret);
-    req.user = decoded; // Attach user to request
-    next();
-  } catch (error) {
-    console.error("❌ JWT verification failed:", error.message);
-    return res.status(403).json({ 
-      success: false, 
-      message: "Invalid or expired token" 
-    });
-  }
-};
-
 // --------------------
 // ROOT ROUTE
 // --------------------
@@ -606,9 +578,7 @@ app.get("/users", async (req, res) => {
 // --------------------
 // GROUP ENDPOINTS (POSTGRESQL)
 // --------------------
-
-// Get all available groups from database
-// Get all available groups from database - UPDATED WITH MEMBER COUNTS
+// Get all available groups
 app.get("/groups", async (req, res) => {
   try {
     const { category, major, search } = req.query;
@@ -646,7 +616,8 @@ app.get("/groups", async (req, res) => {
         name: g.group_name,
         description: g.description,
         creator: g.creator_name,
-        memberCount: parseInt(g.member_count) || 0, // ADD THIS LINE
+        imageUrl: g.image_url, // ✅ ADDED THIS
+        memberCount: parseInt(g.member_count) || 0,
         createdAt: g.created_at
       }))
     });
@@ -658,7 +629,7 @@ app.get("/groups", async (req, res) => {
       message: "Failed to fetch groups" 
     });
   }
-}); 
+});
 
 // Get a specific group by ID
 app.get("/groups/:groupId", async (req, res) => {
@@ -1255,6 +1226,32 @@ app.post("/posts/:postId/comments", async (req, res) => {
 // POST CREATION ENDPOINT WITH CLOUDINARY - FIXED
 // --------------------
 
+// Create a wrapper function to extract token before multer
+const authenticateToken = (req, res, next) => {
+  try {
+    const authHeader = req.headers["authorization"];
+    if (!authHeader) {
+      return res.status(401).json({ 
+        success: false, 
+        message: "Authorization token required" 
+      });
+    }
+
+    const token = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : authHeader;
+    
+    // Verify the token immediately
+    const decoded = jwt.verify(token, secret);
+    req.user = decoded; // Attach user to request
+    next();
+  } catch (error) {
+    console.error("❌ JWT verification failed:", error.message);
+    return res.status(403).json({ 
+      success: false, 
+      message: "Invalid or expired token" 
+    });
+  }
+};
+
 // Update the endpoint - authenticate FIRST, then multer
 app.post("/posts", authenticateToken, upload.array('images', 5), async (req, res) => {
   try {
@@ -1562,56 +1559,34 @@ app.post("/posts/:postId/like", async (req, res) => {
 // SEARCH ENDPOINTS
 // --------------------
 
-// Search groups
-app.get("/search/groups", async (req, res) => {
-  try {
-    const { q } = req.query;
-    
-    if (!q || q.trim() === '') {
-      return res.json({
-        success: true,
-        groups: []
-      });
-    }
+// 1. Fetch Groups
+  useEffect(() => {
+    const fetchGroups = async () => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem("token");
+        const response = await api.listGroups(token);
+        const groupsData = response.groups || [];
+        
+        const transformedGroups = groupsData.map(group => ({
+          id: group.id,
+          name: group.name,
+          count: group.postCount || group.memberCount || 0,
+          description: group.description,
+          imageUrl: group.imageUrl // ✅ Capture the image URL
+        }));
+        
+        setGroups(transformedGroups);
+      } catch (err) {
+        setError(err.message);
+        console.error("Failed to fetch groups:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    const searchTerm = `%${q.trim()}%`;
-    
-    const result = await pool.query(`
-      SELECT 
-        g.*, 
-        u.username as creator_name,
-        COUNT(f.user_id) as member_count,
-        COUNT(p.post_id) as post_count
-      FROM groupok g 
-      LEFT JOIN users u ON g.creator_id = u.user_id
-      LEFT JOIN followings f ON g.group_id = f.group_id
-      LEFT JOIN posts p ON g.group_id = p.group_id
-      WHERE g.group_name ILIKE $1 OR g.description ILIKE $1
-      GROUP BY g.group_id, u.username
-      ORDER BY g.group_name
-    `, [searchTerm]);
-
-    res.json({
-      success: true,
-      groups: result.rows.map(g => ({
-        id: g.group_id,
-        name: g.group_name,
-        description: g.description,
-        creator: g.creator_name,
-        memberCount: parseInt(g.member_count) || 0,
-        postCount: parseInt(g.post_count) || 0,
-        createdAt: g.created_at
-      }))
-    });
-
-  } catch (error) {
-    console.error("❌ Error searching groups:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Failed to search groups" 
-    });
-  }
-});
+    fetchGroups();
+  }, []);
 
 // Search users
 app.get("/search/users", async (req, res) => {
