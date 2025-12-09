@@ -829,6 +829,22 @@ app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), asy
     client.release();
   }
 });
+// Add this to your backend
+app.post("/test-simple", authenticateToken, (req, res) => {
+  console.log("✅ Test endpoint hit!");
+  res.json({ 
+    success: true, 
+    message: "Test successful",
+    timestamp: new Date().toISOString(),
+    user: req.user
+  });
+});
+
+// And add to your api.js
+testSimple: (token) => request("/test-simple", {
+  method: "POST",
+  token
+}),
 // --------------------
 // USERS LIST (POSTGRESQL)
 // --------------------
