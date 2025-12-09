@@ -578,50 +578,40 @@ app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), asy
   const client = await pool.connect();
   
   try {
+    // START TRANSACTION
+    await client.query('BEGIN');
+    
     const userId = req.user.id;
     
-    // ===========================================
-    // CRITICAL FIX: Multer doesn't parse text fields automatically
-    // We need to parse them from req.body
-    // ===========================================
     console.log("📨 Received profile update request");
     console.log("🔍 Checking req.body:", req.body);
     console.log("🔍 Checking req.file:", req.file ? `Yes - ${req.file.originalname}` : "No");
     console.log("🔍 Checking req.headers content-type:", req.headers['content-type']);
     
-    // Extract fields - multer should put text fields in req.body
-    // But sometimes they come as strings that need parsing
-    let username, bio, password, interests;
-    
-    if (typeof req.body === 'object' && req.body !== null) {
-      username = req.body.username;
-      bio = req.body.bio;
-      password = req.body.password;
-      interests = req.body.interests;
-    } else if (typeof req.body === 'string') {
-      // Try to parse as JSON (if frontend sends JSON instead of FormData)
-      try {
-        const parsed = JSON.parse(req.body);
-        username = parsed.username;
-        bio = parsed.bio;
-        password = parsed.password;
-        interests = parsed.interests;
-      } catch (e) {
-        console.log("Could not parse req.body as JSON:", e.message);
-      }
-    }
+    // ===========================================
+    // FIX: Multer DOES parse text fields into req.body
+    // No need for manual parsing if multer is configured correctly
+    // ===========================================
+    const { username, bio, password, interests } = req.body;
     
     console.log(`🔄 Updating profile for user ${userId}`);
-    console.log("📋 Extracted fields:", { username, bio, password: password ? "***" : "not provided", interests });
+    console.log("📋 Extracted fields:", { 
+      username, 
+      bio, 
+      password: password ? "***" : "not provided", 
+      interests 
+    });
 
     // ===========================================
     // 1. VALIDATION
     // ===========================================
     
+    let trimmedUsername = username?.trim();
+    
     // Username validation if provided
-    if (username !== undefined && username !== null) {
-      const trimmedUsername = username.trim();
+    if (trimmedUsername && trimmedUsername !== '') {
       if (trimmedUsername.length < 3) {
+        await client.query('ROLLBACK');
         client.release();
         return res.status(400).json({ 
           success: false, 
@@ -636,6 +626,7 @@ app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), asy
       );
       
       if (usernameCheck.rows.length > 0) {
+        await client.query('ROLLBACK');
         client.release();
         return res.status(400).json({ 
           success: false, 
@@ -648,18 +639,19 @@ app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), asy
     let passwordHash = null;
     if (password && password.trim() !== "") {
       if (password.length < 6) {
+        await client.query('ROLLBACK');
         client.release();
         return res.status(400).json({ 
           success: false, 
           message: "Password must be at least 6 characters" 
         });
       }
-      passwordHash = await bcrypt.hash(password, 12);
+      passwordHash = await bcrypt.hash(password.trim(), 12);
       console.log("✅ Password hash generated");
     }
 
     // ===========================================
-    // 2. IMAGE UPLOAD
+    // 2. IMAGE UPLOAD (do this BEFORE database update)
     // ===========================================
     let profileImageUrl = null;
     if (req.file) {
@@ -677,7 +669,12 @@ app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), asy
         console.log("✅ Profile image uploaded:", profileImageUrl);
       } catch (uploadError) {
         console.error("❌ Cloudinary upload failed:", uploadError);
-        // Don't fail the entire update if image upload fails
+        await client.query('ROLLBACK');
+        client.release();
+        return res.status(500).json({ 
+          success: false, 
+          message: "Failed to upload profile image"
+        });
       }
     }
 
@@ -688,14 +685,14 @@ app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), asy
     const values = [];
     let paramCounter = 1;
 
-    if (username !== undefined && username !== null && username.trim() !== "") {
+    if (trimmedUsername && trimmedUsername !== '') {
       updates.push(`username = $${paramCounter++}`);
-      values.push(username.trim());
+      values.push(trimmedUsername);
     }
     
     if (bio !== undefined && bio !== null) {
       updates.push(`bio = $${paramCounter++}`);
-      values.push(bio.trim() || null); // Allow null for empty bio
+      values.push(bio.trim() || null);
     }
     
     if (passwordHash) {
@@ -707,19 +704,14 @@ app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), asy
       updates.push(`profile_picture_url = $${paramCounter++}`);
       values.push(profileImageUrl);
     }
-    
-    // Handle interests if you want to save them
-    // if (interests !== undefined && interests !== null) {
-    //   updates.push(`interests = $${paramCounter++}`);
-    //   values.push(interests);
-    // }
 
     if (updates.length === 0) {
       console.log("ℹ️ No changes to save");
+      await client.query('ROLLBACK');
       client.release();
-      return res.json({ 
-        success: true, 
-        message: "No changes to save" 
+      return res.status(400).json({ 
+        success: false, 
+        message: "No changes provided" 
       });
     }
 
@@ -745,7 +737,8 @@ app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), asy
         neptun_code,
         major,
         start_year,
-        created_at
+        created_at,
+        updated_at
     `;
 
     console.log("📝 SQL Query:", query);
@@ -757,6 +750,7 @@ app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), asy
     const result = await client.query(query, values);
     
     if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
       client.release();
       return res.status(404).json({ 
         success: false, 
@@ -764,13 +758,17 @@ app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), asy
       });
     }
 
+    // COMMIT TRANSACTION
+    await client.query('COMMIT');
+    
     const updatedUser = result.rows[0];
 
     console.log(`✅ Profile updated for user ${userId}`);
     console.log("📊 Updated user data:", {
       username: updatedUser.username,
       bio: updatedUser.bio,
-      profileImage: updatedUser.profile_picture_url
+      profileImage: updatedUser.profile_picture_url,
+      updatedAt: updatedUser.updated_at
     });
 
     res.json({
@@ -788,11 +786,19 @@ app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), asy
         neptun: updatedUser.neptun_code,
         major: updatedUser.major,
         startYear: updatedUser.start_year,
-        createdAt: updatedUser.created_at
+        createdAt: updatedUser.created_at,
+        updatedAt: updatedUser.updated_at
       }
     });
 
   } catch (error) {
+    // ROLLBACK ON ANY ERROR
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      console.error("Rollback failed:", rollbackError);
+    }
+    
     console.error("❌❌❌ Error updating profile:");
     console.error("Error name:", error.name);
     console.error("Error message:", error.message);
