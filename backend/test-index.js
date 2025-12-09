@@ -10,6 +10,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { v2 as cloudinary } from 'cloudinary';
 import streamifier from 'streamifier';
+import { handleForgotPassword } from './forgotpassword.js'; // Adjust path as needed
 dotenv.config();
 
 // --- CLOUDINARY KONFIGURÁCIÓ ---
@@ -198,6 +199,7 @@ const uploadProfile = multer({
     }
   }
 });
+app.post("/forgot-password", handleForgotPassword);
 // --------------------
 // REGISTER ENDPOINT (FIXED: AUTO-LOGIN TOKEN INCLUDED)
 // --------------------
