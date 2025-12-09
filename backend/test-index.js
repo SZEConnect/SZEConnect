@@ -2223,6 +2223,184 @@ app.get("/status", async (req, res) => {
     });
   }
 });
+
+// ===========================================
+// DEBUG ENDPOINTS
+// ===========================================
+
+// 1. Check database schema
+app.get("/debug/db-schema", async (req, res) => {
+  const client = await pool.connect();
+  try {
+    // Check users table structure
+    const result = await client.query(`
+      SELECT column_name, data_type, is_nullable, column_default
+      FROM information_schema.columns 
+      WHERE table_name = 'users'
+      ORDER BY ordinal_position;
+    `);
+    
+    res.json({
+      success: true,
+      columns: result.rows,
+      totalColumns: result.rowCount,
+      message: "Check if 'bio' and 'updated_at' columns exist"
+    });
+  } catch (error) {
+    console.error("Database schema check error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+// 2. Create missing columns
+app.post("/debug/create-columns", async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    console.log("🔧 Checking/creating missing columns...");
+    
+    // Check if bio exists
+    const bioCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns 
+      WHERE table_name = 'users' AND column_name = 'bio'
+    `);
+    
+    if (bioCheck.rows.length === 0) {
+      await client.query('ALTER TABLE users ADD COLUMN bio TEXT');
+      console.log("✅ Added 'bio' column");
+    } else {
+      console.log("✅ 'bio' column already exists");
+    }
+    
+    // Check if updated_at exists
+    const updatedAtCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns 
+      WHERE table_name = 'users' AND column_name = 'updated_at'
+    `);
+    
+    if (updatedAtCheck.rows.length === 0) {
+      await client.query('ALTER TABLE users ADD COLUMN updated_at TIMESTAMP DEFAULT NOW()');
+      console.log("✅ Added 'updated_at' column");
+    } else {
+      console.log("✅ 'updated_at' column already exists");
+    }
+    
+    // Check if fullname exists
+    const fullnameCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns 
+      WHERE table_name = 'users' AND column_name = 'fullname'
+    `);
+    
+    if (fullnameCheck.rows.length === 0) {
+      await client.query('ALTER TABLE users ADD COLUMN fullname VARCHAR(100)');
+      console.log("✅ Added 'fullname' column");
+    } else {
+      console.log("✅ 'fullname' column already exists");
+    }
+    
+    await client.query('COMMIT');
+    
+    res.json({
+      success: true,
+      message: "Columns checked/created successfully",
+      actions: {
+        bio: bioCheck.rows.length === 0 ? "created" : "already exists",
+        updated_at: updatedAtCheck.rows.length === 0 ? "created" : "already exists",
+        fullname: fullnameCheck.rows.length === 0 ? "created" : "already exists"
+      }
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error("Error creating columns:", error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      hint: "You may need to run SQL directly: ALTER TABLE users ADD COLUMN updated_at TIMESTAMP DEFAULT NOW();"
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// 3. Test simple profile update (without FormData)
+app.put("/debug/test-update", authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    const userId = req.user.id;
+    const { username, bio } = req.body;
+    
+    console.log("🧪 Test update:", { userId, username, bio });
+    
+    // Try to update with minimal fields
+    const result = await client.query(
+      `UPDATE users 
+       SET username = $1, bio = $2
+       WHERE user_id = $3 
+       RETURNING user_id, username, bio`,
+      [username, bio, userId]
+    );
+    
+    await client.query('COMMIT');
+    
+    console.log("🧪 Update result:", result.rows[0]);
+    
+    if (result.rows.length === 0) {
+      res.status(404).json({ success: false, message: "User not found" });
+    } else {
+      res.json({ 
+        success: true, 
+        message: "Test update successful",
+        user: result.rows[0]
+      });
+    }
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error("Test update error:", error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      code: error.code,
+      hint: error.code === '42703' ? "Database column missing!" : "Unknown error"
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// 4. Check a specific user's current data
+app.get("/debug/user/:userId", authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const userId = req.params.userId || req.user.id;
+    
+    const result = await client.query(
+      `SELECT user_id, username, email, bio, fullname, profile_picture_url, 
+              created_at, updated_at
+       FROM users WHERE user_id = $1`,
+      [userId]
+    );
+    
+    if (result.rows.length === 0) {
+      res.status(404).json({ success: false, message: "User not found" });
+    } else {
+      res.json({
+        success: true,
+        user: result.rows[0],
+        columns: Object.keys(result.rows[0])
+      });
+    }
+  } catch (error) {
+    console.error("Error fetching user:", error);
+    res.status(500).json({ success: false, error: error.message });
+  } finally {
+    client.release();
+  }
+});
 // --------------------
 // 404 HANDLER (KEEP THIS LAST)
 // --------------------
@@ -2238,7 +2416,16 @@ app.use((req, res) => {
       testDb: "GET /test-db",
       register: "POST /register",
       login: "POST /login",
-      profile: "GET /profile",
+      profile: {
+        get: "GET /profile",
+        update: "PUT /profile"
+      },
+      debug: {
+        dbSchema: "GET /debug/db-schema",
+        createColumns: "POST /debug/create-columns",
+        testUpdate: "PUT /debug/test-update",
+        user: "GET /debug/user/:id"
+      },
       users: "GET /users",
       groups: "GET /groups",
       groupDetail: "GET /groups/:id",
@@ -2246,8 +2433,7 @@ app.use((req, res) => {
       leaveGroup: "POST /groups/:id/leave",
       userGroups: "GET /user/groups",
       devStats: "GET /dev/stats",
-      devTestUser: "POST /dev/test-user",
-      testEmail: "GET /test-email"
+      devTestUser: "POST /dev/test-user"
     }
   });
 });
