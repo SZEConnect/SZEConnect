@@ -578,30 +578,28 @@ app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), asy
   const client = await pool.connect();
   
   try {
+    console.log("=".repeat(50));
+    console.log("📨 START: Profile Update Request");
+    console.log("=".repeat(50));
+    
     // START TRANSACTION
     await client.query('BEGIN');
     
     const userId = req.user.id;
+    console.log("👤 User ID from token:", userId);
     
-    console.log("📨 Received profile update request");
     console.log("🔍 Checking req.body:", req.body);
     console.log("🔍 Checking req.file:", req.file ? `Yes - ${req.file.originalname}` : "No");
-    console.log("🔍 Checking req.headers content-type:", req.headers['content-type']);
     
-    // ===========================================
-    // FIX: Multer DOES parse text fields into req.body
-    // No need for manual parsing if multer is configured correctly
-    // ===========================================
-    const { username, bio, password, interests } = req.body;
+    // Extract fields - include fullName
+    const { username, bio, password, fullName } = req.body;
     
-    console.log(`🔄 Updating profile for user ${userId}`);
-    console.log("📋 Extracted fields:", { 
-      username, 
-      bio, 
-      password: password ? "***" : "not provided", 
-      interests 
-    });
-
+    console.log("📦 Extracted fields from req.body:");
+    console.log("  username:", username);
+    console.log("  bio:", bio);
+    console.log("  fullName:", fullName);
+    console.log("  password:", password ? "***" : "not provided");
+    
     // ===========================================
     // 1. VALIDATION
     // ===========================================
@@ -610,6 +608,7 @@ app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), asy
     
     // Username validation if provided
     if (trimmedUsername && trimmedUsername !== '') {
+      console.log("🔐 Validating username...");
       if (trimmedUsername.length < 3) {
         await client.query('ROLLBACK');
         client.release();
@@ -638,6 +637,7 @@ app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), asy
     // Password validation if provided
     let passwordHash = null;
     if (password && password.trim() !== "") {
+      console.log("🔐 Processing password change...");
       if (password.length < 6) {
         await client.query('ROLLBACK');
         client.release();
@@ -651,19 +651,12 @@ app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), asy
     }
 
     // ===========================================
-    // 2. IMAGE UPLOAD (do this BEFORE database update)
+    // 2. IMAGE UPLOAD
     // ===========================================
     let profileImageUrl = null;
     if (req.file) {
       try {
         console.log("☁️ Uploading profile picture to Cloudinary...");
-        console.log("File details:", {
-          originalname: req.file.originalname,
-          size: req.file.size,
-          mimetype: req.file.mimetype,
-          fieldname: req.file.fieldname
-        });
-        
         const cloudinaryResult = await uploadToCloudinary(req.file.buffer, 'szeconnect-profiles');
         profileImageUrl = cloudinaryResult.secure_url;
         console.log("✅ Profile image uploaded:", profileImageUrl);
@@ -685,25 +678,47 @@ app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), asy
     const values = [];
     let paramCounter = 1;
 
+    console.log("🔨 Building SQL query...");
+    
     if (trimmedUsername && trimmedUsername !== '') {
-      updates.push(`username = $${paramCounter++}`);
+      updates.push(`username = $${paramCounter}`);
       values.push(trimmedUsername);
+      console.log(`  ✅ Adding username: ${trimmedUsername}`);
+      paramCounter++;
     }
     
     if (bio !== undefined && bio !== null) {
-      updates.push(`bio = $${paramCounter++}`);
-      values.push(bio.trim() || null);
+      const trimmedBio = bio.trim();
+      updates.push(`bio = $${paramCounter}`);
+      values.push(trimmedBio || null);
+      console.log(`  ✅ Adding bio: "${trimmedBio}"`);
+      paramCounter++;
+    }
+    
+    if (fullName !== undefined && fullName !== null && fullName.trim() !== '') {
+      const trimmedFullName = fullName.trim();
+      updates.push(`fullname = $${paramCounter}`);
+      values.push(trimmedFullName);
+      console.log(`  ✅ Adding fullName: "${trimmedFullName}"`);
+      paramCounter++;
     }
     
     if (passwordHash) {
-      updates.push(`password_hash = $${paramCounter++}`);
+      updates.push(`password_hash = $${paramCounter}`);
       values.push(passwordHash);
+      console.log(`  ✅ Adding password hash`);
+      paramCounter++;
     }
     
     if (profileImageUrl) {
-      updates.push(`profile_picture_url = $${paramCounter++}`);
+      updates.push(`profile_picture_url = $${paramCounter}`);
       values.push(profileImageUrl);
+      console.log(`  ✅ Adding profile image URL: ${profileImageUrl}`);
+      paramCounter++;
     }
+
+    console.log("📊 Total updates to apply:", updates.length);
+    console.log("📋 Values array:", values);
 
     if (updates.length === 0) {
       console.log("ℹ️ No changes to save");
@@ -717,41 +732,72 @@ app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), asy
 
     // Add updated_at timestamp
     updates.push(`updated_at = NOW()`);
+    console.log("  ✅ Adding updated_at timestamp");
 
     // Add userId as the last parameter
     values.push(userId);
+    
+    // Check if created_at column exists first
+    let includeCreatedAt = true;
+    try {
+      // Quick check if created_at column exists
+      const checkResult = await client.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'users' AND column_name = 'created_at'
+      `);
+      includeCreatedAt = checkResult.rows.length > 0;
+      console.log("📋 created_at column exists:", includeCreatedAt);
+    } catch (checkError) {
+      console.log("⚠️ Could not check created_at column, assuming it exists");
+    }
+    
+    const returningFields = [
+      'user_id', 
+      'username', 
+      'email', 
+      'bio', 
+      'profile_picture_url',
+      'fullname',
+      'gender',
+      'birthdate',
+      'neptun_code',
+      'major',
+      'start_year',
+      'updated_at'
+    ];
+    
+    // Add created_at only if it exists
+    if (includeCreatedAt) {
+      returningFields.push('created_at');
+    }
     
     const query = `
       UPDATE users 
       SET ${updates.join(", ")} 
       WHERE user_id = $${paramCounter} 
-      RETURNING 
-        user_id, 
-        username, 
-        email, 
-        bio, 
-        profile_picture_url,
-        fullname,
-        gender,
-        birthdate,
-        neptun_code,
-        major,
-        start_year,
-        created_at,
-        updated_at
+      RETURNING ${returningFields.join(", ")}
     `;
 
-    console.log("📝 SQL Query:", query);
-    console.log("📋 Query values:", values);
+    console.log("📝 Final SQL Query:");
+    console.log(query);
+    console.log("🔢 Query parameters:", values);
 
     // ===========================================
     // 4. EXECUTE UPDATE
     // ===========================================
+    console.log("🚀 Executing database update...");
     const result = await client.query(query, values);
+    
+    console.log("📊 Query result:", {
+      rowCount: result.rowCount,
+      rows: result.rows
+    });
     
     if (result.rows.length === 0) {
       await client.query('ROLLBACK');
       client.release();
+      console.log("❌ User not found in database");
       return res.status(404).json({ 
         success: false, 
         message: "User not found" 
@@ -760,51 +806,64 @@ app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), asy
 
     // COMMIT TRANSACTION
     await client.query('COMMIT');
+    console.log("✅ Transaction committed successfully");
     
     const updatedUser = result.rows[0];
 
-    console.log(`✅ Profile updated for user ${userId}`);
+    console.log("🎉 PROFILE UPDATED SUCCESSFULLY");
     console.log("📊 Updated user data:", {
+      user_id: updatedUser.user_id,
       username: updatedUser.username,
       bio: updatedUser.bio,
-      profileImage: updatedUser.profile_picture_url,
-      updatedAt: updatedUser.updated_at
+      fullname: updatedUser.fullname,
+      profile_picture_url: updatedUser.profile_picture_url,
+      updated_at: updatedUser.updated_at,
+      created_at: updatedUser.created_at
     });
+
+    // Build response object
+    const userResponse = {
+      id: updatedUser.user_id,
+      username: updatedUser.username,
+      email: updatedUser.email,
+      bio: updatedUser.bio,
+      profileImage: updatedUser.profile_picture_url,
+      fullName: updatedUser.fullname,
+      gender: updatedUser.gender,
+      birthdate: updatedUser.birthdate,
+      neptun: updatedUser.neptun_code,
+      major: updatedUser.major,
+      startYear: updatedUser.start_year,
+      updatedAt: updatedUser.updated_at
+    };
+    
+    // Only add createdAt if it exists in the result
+    if (updatedUser.created_at !== undefined) {
+      userResponse.createdAt = updatedUser.created_at;
+    }
 
     res.json({
       success: true,
       message: "Profile updated successfully",
-      user: {
-        id: updatedUser.user_id,
-        username: updatedUser.username,
-        email: updatedUser.email,
-        bio: updatedUser.bio,
-        profileImage: updatedUser.profile_picture_url,
-        fullName: updatedUser.fullname,
-        gender: updatedUser.gender,
-        birthdate: updatedUser.birthdate,
-        neptun: updatedUser.neptun_code,
-        major: updatedUser.major,
-        startYear: updatedUser.start_year,
-        createdAt: updatedUser.created_at,
-        updatedAt: updatedUser.updated_at
-      }
+      user: userResponse
     });
 
   } catch (error) {
-    // ROLLBACK ON ANY ERROR
-    try {
-      await client.query('ROLLBACK');
-    } catch (rollbackError) {
-      console.error("Rollback failed:", rollbackError);
-    }
-    
-    console.error("❌❌❌ Error updating profile:");
+    console.error("=".repeat(50));
+    console.error("❌❌❌ ERROR UPDATING PROFILE:");
     console.error("Error name:", error.name);
     console.error("Error message:", error.message);
     console.error("Error code:", error.code);
     console.error("Error detail:", error.detail);
-    console.error("Full error:", error);
+    console.error("=".repeat(50));
+    
+    // ROLLBACK ON ANY ERROR
+    try {
+      await client.query('ROLLBACK');
+      console.log("↩️ Transaction rolled back");
+    } catch (rollbackError) {
+      console.error("Rollback failed:", rollbackError);
+    }
     
     if (error.code === '23505') { // Unique violation
       res.status(400).json({ 
@@ -812,10 +871,22 @@ app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), asy
         message: "Username already taken by another user" 
       });
     } else if (error.code === '42703') { // Undefined column
+      console.error("❌ DATABASE COLUMN MISSING!");
+      console.error("Missing column error details:", error);
+      
+      // Provide specific guidance based on error detail
+      let missingColumn = "unknown";
+      if (error.detail) {
+        if (error.detail.includes('created_at')) missingColumn = 'created_at';
+        else if (error.detail.includes('bio')) missingColumn = 'bio';
+        else if (error.detail.includes('fullname')) missingColumn = 'fullname';
+        else if (error.detail.includes('updated_at')) missingColumn = 'updated_at';
+      }
+      
       res.status(500).json({ 
         success: false, 
-        message: "Database column error - check if 'bio' column exists",
-        hint: "Run: ALTER TABLE users ADD COLUMN bio TEXT;"
+        message: `Database column error: ${missingColumn} column not found`,
+        hint: `Run: ALTER TABLE users ADD COLUMN ${missingColumn} ${getColumnType(missingColumn)};`
       });
     } else {
       res.status(500).json({ 
@@ -827,8 +898,21 @@ app.put("/profile", authenticateToken, uploadProfile.single('profileImage'), asy
     }
   } finally {
     client.release();
+    console.log("🔓 Database connection released");
+    console.log("=".repeat(50));
   }
 });
+
+// Helper function to get SQL type for missing columns
+function getColumnType(columnName) {
+  const columnTypes = {
+    'bio': 'TEXT',
+    'fullname': 'VARCHAR(100)',
+    'created_at': 'TIMESTAMP DEFAULT NOW()',
+    'updated_at': 'TIMESTAMP DEFAULT NOW()'
+  };
+  return columnTypes[columnName] || 'TEXT';
+}
 // Add this to your backend
 app.post("/test-simple", authenticateToken, (req, res) => {
   console.log("✅ Test endpoint hit!");
