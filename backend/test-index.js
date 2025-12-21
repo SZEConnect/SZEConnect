@@ -2032,7 +2032,7 @@ app.get("/search/users", async (req, res) => {
   }
 });
 // --------------------
-// GET USER PROFILE BY ID (SAFER VERSION)
+// GET USER PROFILE BY ID (UPDATED - HIDES SENSITIVE DATA)
 // --------------------
 app.get("/users/:userId", async (req, res) => {
   try {
@@ -2042,7 +2042,20 @@ app.get("/users/:userId", async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid user ID" });
     }
 
-    // ✅ FIX: Use SELECT * to prevent crashes if a specific column name is wrong
+    // Check if the request is from the user themselves
+    let isOwnProfile = false;
+    const authHeader = req.headers["authorization"];
+    
+    if (authHeader) {
+      try {
+        const token = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : authHeader;
+        const decoded = jwt.verify(token, secret);
+        isOwnProfile = decoded.id === userId;
+      } catch (authError) {
+        // Token is invalid, treat as other user
+      }
+    }
+
     const result = await pool.query(
       'SELECT * FROM users WHERE user_id = $1',
       [userId]
@@ -2054,20 +2067,25 @@ app.get("/users/:userId", async (req, res) => {
 
     const user = result.rows[0];
     
-    // Format response (handle potential missing fields gracefully)
+    // Format response - hide sensitive data if not own profile
     const userProfile = {
       id: user.user_id,
       username: user.username,
-      email: user.email,
-      neptun: user.neptun_code,
-      fullName: user.fullname || user.full_name, // Try both naming conventions
+      // Email and Neptun only for own profile
+      ...(isOwnProfile ? { 
+        email: user.email,
+        neptun: user.neptun_code 
+      } : {}),
+      fullName: user.fullname || user.full_name,
       birthYear: user.birthdate ? new Date(user.birthdate).getFullYear() : null,
       gender: user.gender,
       startYear: user.start_year,
       major: user.major,
       bio: user.bio,
-      profileImage: user.profile_picture_url || user.profile_image, // Try both
-      createdAt: user.created_at
+      profileImage: user.profile_picture_url || user.profile_image,
+      createdAt: user.created_at,
+      // Add this flag so frontend knows what data is available
+      isOwnProfile: isOwnProfile
     };
 
     res.json({
