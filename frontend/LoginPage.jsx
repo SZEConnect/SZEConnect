@@ -9,6 +9,17 @@ export default function LoginPage() {
   const [lang, setLang] = useState("hu");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  
+  // ADD THIS: Popup state
+  const [popup, setPopup] = useState({ show: false, type: "success", message: "" });
+  
+  // ADD THIS: Function to show popup
+  const showPopup = (type, message) => {
+    setPopup({ show: true, type, message });
+    setTimeout(() => {
+      setPopup({ show: false, type, message: "" });
+    }, 3000);
+  };
 
   const t = (key) => {
     const hu = {
@@ -25,6 +36,11 @@ export default function LoginPage() {
         neptun: "Érvénytelen Neptun-kód (6 karakter, A–Z és számok).",
         password: "A jelszó nem lehet üres.",
       },
+      // ADD POPUP MESSAGES
+      loginSuccess: "Sikeres bejelentkezés!",
+      loginError: "Hiba történt a bejelentkezéskor",
+      invalidCredentials: "Hibás Neptun-kód vagy jelszó",
+      serverError: "Szerverhiba, próbáld újra később",
     };
     const en = {
       title: "Login",
@@ -40,6 +56,11 @@ export default function LoginPage() {
         neptun: "Invalid Neptun code (6 chars, A–Z and digits).",
         password: "Password cannot be empty.",
       },
+      // ADD POPUP MESSAGES
+      loginSuccess: "Login successful!",
+      loginError: "Error during login",
+      invalidCredentials: "Invalid Neptun code or password",
+      serverError: "Server error, please try again later",
     };
     return (lang === "hu" ? hu : en)[key];
   };
@@ -53,6 +74,7 @@ export default function LoginPage() {
     return !errs.neptun && !errs.password;
   };
 
+  // MODIFY THIS: onSubmit function
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
@@ -60,9 +82,30 @@ export default function LoginPage() {
       setIsLoading(true);
       const res = await api.login(neptun.trim().toUpperCase(), password);
       localStorage.setItem("token", res.token);
-      navigate("/home");
+      
+      // ADD: Show success popup
+      showPopup("success", t("loginSuccess"));
+      
+      // Navigate after popup is shown
+      setTimeout(() => {
+        navigate("/home");
+      }, 1500);
+      
     } catch (err) {
-      alert(err.message);
+      console.error("Login error:", err);
+      
+      // ADD: Show appropriate error message based on error type
+      let errorMessage = t("loginError");
+      if (err.message && err.message.includes("credentials")) {
+        errorMessage = t("invalidCredentials");
+      } else if (err.message && err.message.includes("network") || err.message.includes("server")) {
+        errorMessage = t("serverError");
+      } else {
+        errorMessage = err.message || t("loginError");
+      }
+      
+      // CHANGE: Replace alert with popup
+      showPopup("error", errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -72,6 +115,22 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen w-full bg-[#FAFAFA] flex flex-col justify-center px-6 md:px-12 relative">
+      {/* ADD THE POPUP COMPONENT */}
+      {popup.show && (
+        <div
+          className={`
+            fixed top-8 left-1/2 -translate-x-1/2 z-[9999]
+            px-6 py-4 rounded-xl shadow-lg border
+            text-white font-semibold transition-all duration-300
+            ${popup.type === "success" 
+              ? "bg-[#2A3F5B] border-[#E1860E]" 
+              : "bg-red-600 border-red-300"}
+          `}
+        >
+          {popup.message}
+        </div>
+      )}
+
       {/* Language toggle */}
       <button
         onClick={() => setLang(lang === "hu" ? "en" : "hu")}
@@ -140,7 +199,6 @@ export default function LoginPage() {
                 <p className="mt-2 text-sm text-red-600">{errors.password}</p>
               )}
             </div>
-
 
             {/* Buttons */}
             <div className="flex flex-col items-center gap-3">
