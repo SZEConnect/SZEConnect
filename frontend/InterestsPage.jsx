@@ -6,7 +6,17 @@ export default function InterestsPage() {
   const [lang, setLang] = useState("hu");
   const [selected, setSelected] = useState([]);
   const [menuOpen, setMenuOpen] = useState(false);
-
+  
+  // ADD THIS: Popup state
+  const [popup, setPopup] = useState({ show: false, type: "success", message: "" });
+  
+  // ADD THIS: Function to show popup
+  const showPopup = (type, message) => {
+    setPopup({ show: true, type, message });
+    setTimeout(() => {
+      setPopup({ show: false, type, message: "" });
+    }, 3000);
+  };
 
   const t = useMemo(() => {
     const hu = {
@@ -17,6 +27,12 @@ export default function InterestsPage() {
       logout: "Kijelentkezés",
       save: "Mentés",
       selectedGroups: "Kiválasztott csoportok",
+      // ADD POPUP MESSAGES
+      saveSuccess: "Csoportok sikeresen mentve!",
+      saveError: "Hiba történt a mentés során",
+      selectWarning: "Válassz ki legalább egy csoportot a mentéshez!",
+      groupsSelected: "csoport kiválasztva",
+      groupsSelectedPlural: "csoport kiválasztva",
     };
     const en = {
       title: "Group Selection",
@@ -26,6 +42,12 @@ export default function InterestsPage() {
       logout: "Logout",
       save: "Save",
       selectedGroups: "Selected groups",
+      // ADD POPUP MESSAGES
+      saveSuccess: "Groups saved successfully!",
+      saveError: "Error saving groups",
+      selectWarning: "Please select at least one group to save!",
+      groupsSelected: "group selected",
+      groupsSelectedPlural: "groups selected",
     };
     return lang === "hu" ? hu : en;
   }, [lang]);
@@ -72,116 +94,155 @@ export default function InterestsPage() {
   const removeSelected = (group) =>
     setSelected((prev) => prev.filter((x) => x !== group));
 
+  // MODIFY THIS: onSave function
   const onSave = () => {
+    if (selected.length === 0) {
+      // CHANGE: Replace alert with popup
+      showPopup("error", t.selectWarning);
+      return;
+    }
+    
     console.log("Saved groups:", selected);
-    alert(lang === "hu" ? "Mentve!" : "Saved!");
-    navigate("/home");
+    
+    try {
+      // ADD: Show success popup with count
+      const groupCount = selected.length;
+      const countMessage = lang === "hu" 
+        ? `${groupCount} ${groupCount === 1 ? t.groupsSelected : t.groupsSelectedPlural}`
+        : `${groupCount} ${groupCount === 1 ? t.groupsSelected : t.groupsSelectedPlural}`;
+      
+      showPopup("success", `${t.saveSuccess} (${countMessage})`);
+      
+      // Navigate after popup is shown
+      setTimeout(() => {
+        navigate("/home");
+      }, 1500);
+    } catch (error) {
+      console.error("Error saving groups:", error);
+      // CHANGE: Replace alert with popup
+      showPopup("error", t.saveError);
+    }
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FDFDFE]">
+      {/* ADD THE POPUP COMPONENT */}
+      {popup.show && (
+        <div
+          className={`
+            fixed top-8 left-1/2 -translate-x-1/2 z-[9999]
+            px-6 py-4 rounded-xl shadow-lg border
+            text-white font-semibold transition-all duration-300
+            ${popup.type === "success" 
+              ? "bg-[#2A3F5B] border-[#E1860E]" 
+              : "bg-red-600 border-red-300"}
+          `}
+        >
+          {popup.message}
+        </div>
+      )}
+
       {/* HEADER */}
-    <header className="flex items-center justify-between px-4 sm:px-6 md:px-10 py-4 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
-      {/* Logo + Brand (always visible) */}
-      <button
-        onClick={() => navigate("/home")}
-        className="flex items-center gap-2 sm:gap-3 focus:outline-none hover:opacity-90 transition"
-        title="Go to Home"
-      >
-        <LogoShare className="w-8 h-8 sm:w-10 sm:h-10" />
-        <span className="text-xl sm:text-2xl font-bold whitespace-nowrap">{t.brand}</span>
-      </button>
-
-      {/* Desktop buttons */}
-      <div className="hidden md:flex items-center gap-4">
+      <header className="flex items-center justify-between px-4 sm:px-6 md:px-10 py-4 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
+        {/* Logo + Brand (always visible) */}
         <button
-          onClick={() => setLang(lang === "hu" ? "en" : "hu")}
-          className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
+          onClick={() => navigate("/home")}
+          className="flex items-center gap-2 sm:gap-3 focus:outline-none hover:opacity-90 transition"
+          title="Go to Home"
         >
-          {lang === "hu" ? "EN" : "HU"}
+          <LogoShare className="w-8 h-8 sm:w-10 sm:h-10" />
+          <span className="text-xl sm:text-2xl font-bold whitespace-nowrap">{t.brand}</span>
         </button>
 
-        <button
-          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
-          title={t.info}
-          onClick={() => navigate("/info")}
-        >
-          i
-        </button>
+        {/* Desktop buttons */}
+        <div className="hidden md:flex items-center gap-4">
+          <button
+            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+            className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
+          >
+            {lang === "hu" ? "EN" : "HU"}
+          </button>
 
-        <button
-          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
-          title={t.profile}
-          onClick={() => navigate("/profile")}
-        >
-          👤
-        </button>
+          <button
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
+            title={t.info}
+            onClick={() => navigate("/info")}
+          >
+            i
+          </button>
 
-        <button
-          className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
-          onClick={() => navigate("/login")}
-        >
-          {t.logout}
-        </button>
-      </div>
+          <button
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
+            title={t.profile}
+            onClick={() => navigate("/profile")}
+          >
+            👤
+          </button>
 
-      {/* Mobile Hamburger */}
-      <div className="md:hidden relative">
-        <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="w-10 h-10 rounded-md bg-[#E1860E] text-white text-2xl font-bold flex items-center justify-center shadow hover:opacity-90"
-          aria-label="Toggle menu"
-        >
-          {menuOpen ? "×" : "☰"}
-        </button>
+          <button
+            className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
+            onClick={() => navigate("/login")}
+          >
+            {t.logout}
+          </button>
+        </div>
 
-        {/* Dropdown */}
-        {menuOpen && (
-          <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
-            <button
-              onClick={() => {
-                setLang(lang === "hu" ? "en" : "hu");
-                setMenuOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
-            >
-              🌐 {lang === "hu" ? "EN" : "HU"}
-            </button>
+        {/* Mobile Hamburger */}
+        <div className="md:hidden relative">
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="w-10 h-10 rounded-md bg-[#E1860E] text-white text-2xl font-bold flex items-center justify-center shadow hover:opacity-90"
+            aria-label="Toggle menu"
+          >
+            {menuOpen ? "×" : "☰"}
+          </button>
 
-            <button
-              onClick={() => {
-                navigate("/info");
-                setMenuOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
-            >
-              ℹ️ {t.info}
-            </button>
+          {/* Dropdown */}
+          {menuOpen && (
+            <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
+              <button
+                onClick={() => {
+                  setLang(lang === "hu" ? "en" : "hu");
+                  setMenuOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+              >
+                🌐 {lang === "hu" ? "EN" : "HU"}
+              </button>
 
-            <button
-              onClick={() => {
-                navigate("/profile");
-                setMenuOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
-            >
-              👤 {t.profile}
-            </button>
+              <button
+                onClick={() => {
+                  navigate("/info");
+                  setMenuOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+              >
+                ℹ️ {t.info}
+              </button>
 
-            <button
-              onClick={() => {
-                navigate("/login");
-                setMenuOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 font-semibold text-[#E1860E] hover:bg-[#EDF5FA]"
-            >
-              🚪 {t.logout}
-            </button>
-          </div>
-        )}
-      </div>
-    </header>
+              <button
+                onClick={() => {
+                  navigate("/profile");
+                  setMenuOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+              >
+                👤 {t.profile}
+              </button>
 
+              <button
+                onClick={() => {
+                  navigate("/login");
+                  setMenuOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 font-semibold text-[#E1860E] hover:bg-[#EDF5FA]"
+              >
+                🚪 {t.logout}
+              </button>
+            </div>
+          )}
+        </div>
+      </header>
 
       {/* MAIN CONTENT */}
       <main className="flex-grow flex flex-col lg:flex-row w-full px-10 py-12 gap-10">
@@ -216,7 +277,6 @@ export default function InterestsPage() {
               })}
             </ul>
           </div>
-
         </div>
 
         {/* RIGHT COLUMN: SELECTED GROUPS */}
@@ -230,7 +290,7 @@ export default function InterestsPage() {
               <p className="text-[#1F3351]/60">
                 {lang === "hu"
                   ? "Még nem választottál ki egyetlen csoportot sem."
-                  : "You haven’t selected any groups yet."}
+                  : "You haven't selected any groups yet."}
               </p>
             ) : (
               <ul className="flex flex-wrap gap-3">
@@ -255,14 +315,14 @@ export default function InterestsPage() {
       </main>
 
       {/* SAVE BUTTON */}
-        <div className="flex justify-center px-10 pb-10">
-          <button
-            className="rounded-xl px-8 py-3 font-semibold bg-[#E1860E] text-white hover:opacity-95 shadow-md focus:ring-4 focus:ring-[#E1860E]/30"
-            onClick={onSave}
-          >
-            {t.save}
-          </button>
-        </div>
+      <div className="flex justify-center px-10 pb-10">
+        <button
+          className="rounded-xl px-8 py-3 font-semibold bg-[#E1860E] text-white hover:opacity-95 shadow-md focus:ring-4 focus:ring-[#E1860E]/30"
+          onClick={onSave}
+        >
+          {t.save}
+        </button>
+      </div>
     </div>
   );
 }
