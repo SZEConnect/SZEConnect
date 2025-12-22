@@ -73,6 +73,17 @@ export default function PostComposerPage() {
   const [errors, setErrors] = useState({});
   const [images, setImages] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  
+  // ADD THIS: Popup state
+  const [popup, setPopup] = useState({ show: false, type: "success", message: "" });
+
+  // ADD THIS: Function to show popup
+  const showPopup = (type, message) => {
+    setPopup({ show: true, type, message });
+    setTimeout(() => {
+      setPopup({ show: false, type, message: "" });
+    }, 3000);
+  };
 
   // Fetch groups from API
   useEffect(() => {
@@ -152,42 +163,51 @@ export default function PostComposerPage() {
     return Object.keys(e).length === 0;
   };
 
-const onSubmit = async (e) => {
-  e.preventDefault();
-  
-  if (!token) {
-    alert(t.loginRequired);
-    return;
-  }
-
-  if (!validate()) return;
-
-  try {
-    setSubmitting(true);
-
-    const payload = {
-      title: title.trim(),
-      content: content.trim(),
-      groupId: group.id
-    };
-
-    // The API will now handle FormData conversion automatically
-    const response = await api.createPost(payload, images, token);
+  // MODIFY THIS: onSubmit function
+  const onSubmit = async (e) => {
+    e.preventDefault();
     
-    if (response.success) {
-      alert(t.postSuccess);
-      // Clean up object URLs
-      images.forEach(img => URL.revokeObjectURL(img.url));
-      // Navigate to the group page
-      navigate(`/groups/${group.id}`);
+    if (!token) {
+      // CHANGE: Replace alert with popup
+      showPopup("error", t.loginRequired);
+      return;
     }
-  } catch (error) {
-    console.error("Failed to create post:", error);
-    alert(t.postError + ": " + (error.message || "Unknown error"));
-  } finally {
-    setSubmitting(false);
-  }
-};
+
+    if (!validate()) return;
+
+    try {
+      setSubmitting(true);
+
+      const payload = {
+        title: title.trim(),
+        content: content.trim(),
+        groupId: group.id
+      };
+
+      // The API will now handle FormData conversion automatically
+      const response = await api.createPost(payload, images, token);
+      
+      if (response.success) {
+        // CHANGE: Replace alert with popup
+        showPopup("success", t.postSuccess);
+        
+        // Clean up object URLs
+        images.forEach(img => URL.revokeObjectURL(img.url));
+        
+        // Navigate to the group page after popup is shown
+        setTimeout(() => {
+          navigate(`/groups/${group.id}`);
+        }, 1500);
+      }
+    } catch (error) {
+      console.error("Failed to create post:", error);
+      // CHANGE: Replace alert with popup
+      showPopup("error", `${t.postError}: ${error.message || "Unknown error"}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Render
   return (
     <div className="min-h-screen bg-[#FDFDFE] flex flex-col">
@@ -482,6 +502,22 @@ const onSubmit = async (e) => {
             </div>
           </form>
         </div>
+        
+        {/* ADD THIS: The popup JSX */}
+        {popup.show && (
+          <div
+            className={`
+              fixed top-8 left-1/2 -translate-x-1/2 z-[9999]
+              px-6 py-4 rounded-xl shadow-lg border
+              text-white font-semibold transition-all duration-300
+              ${popup.type === "success" 
+                ? "bg-[#2A3F5B] border-[#E1860E]" 
+                : "bg-red-600 border-red-300"}
+            `}
+          >
+            {popup.message}
+          </div>
+        )}
       </main>
     </div>
   );
