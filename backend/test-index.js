@@ -4,7 +4,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
 import pool, { testConnection } from './database.js';
-import { sendWelcomeEmail, testEmailConnection } from './services/emailService.js';
+import { sendWelcomeEmail, testEmailConnection,sendBanNotificationEmail,sendWarningEmail } from './services/emailService.js';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -2102,7 +2102,359 @@ app.get("/users/:userId", async (req, res) => {
     });
   }
 });
+// --------------------
+// REPORT POST ENDPOINT (Updated for your email service)
+// --------------------
+app.post("/posts/:postId/report", authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    const reporterId = req.user.id;
+    const postId = parseInt(req.params.postId);
+    const { reason } = req.body;
 
+    if (!reason || reason.trim() === '') {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Please provide a reason for reporting" 
+      });
+    }
+
+    await client.query('BEGIN');
+
+    // 1. Get post and author info
+    const postResult = await client.query(
+      `SELECT p.*, u.user_id as author_id, u.email, u.username, u.warning_count 
+       FROM posts p
+       JOIN users u ON p.user_id = u.user_id
+       WHERE p.post_id = $1`,
+      [postId]
+    );
+
+    if (postResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ 
+        success: false, 
+        message: "Post not found" 
+      });
+    }
+
+    const post = postResult.rows[0];
+    const reportedUserId = post.author_id;
+
+    // 2. Prevent self-reporting
+    if (reporterId === reportedUserId) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ 
+        success: false, 
+        message: "You cannot report your own post" 
+      });
+    }
+
+    // 3. Check if already reported by this user
+    const existingReport = await client.query(
+      `SELECT report_id FROM reports 
+       WHERE post_id = $1 AND user_id = $2 AND status = 'pending'`,
+      [postId, reporterId]
+    );
+
+    if (existingReport.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ 
+        success: false, 
+        message: "You have already reported this post" 
+      });
+    }
+
+    // 4. Create report
+    const reportResult = await client.query(
+      `INSERT INTO reports 
+       (post_id, user_id, reported_user_id, reason, created_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       RETURNING *`,
+      [postId, reporterId, reportedUserId, reason.trim()]
+    );
+
+    // 5. Get current user warnings and ban status
+    const userResult = await client.query(
+      `SELECT warning_count, banned_until FROM users WHERE user_id = $1`,
+      [reportedUserId]
+    );
+
+    let currentWarningCount = userResult.rows[0].warning_count;
+    const bannedUntil = userResult.rows[0].banned_until;
+
+    // 6. Check if user is currently banned
+    const now = new Date();
+    const isCurrentlyBanned = bannedUntil && new Date(bannedUntil) > now;
+
+    if (isCurrentlyBanned) {
+      await client.query('COMMIT');
+      return res.json({
+        success: true,
+        message: "Post reported. User is currently banned.",
+        warningCount: currentWarningCount,
+        banned: true
+      });
+    }
+
+    // 7. Increment warning count
+    const newWarningCount = currentWarningCount + 1;
+    
+    await client.query(
+      `UPDATE users SET warning_count = $1 WHERE user_id = $2`,
+      [newWarningCount, reportedUserId]
+    );
+
+    // 8. Check if this is the 3rd warning
+    let banned = false;
+    if (newWarningCount >= 3) {
+      // Set ban for 2 hours
+      const banUntil = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+      await client.query(
+        `UPDATE users SET banned_until = $1 WHERE user_id = $2`,
+        [banUntil, reportedUserId]
+      );
+      banned = true;
+      
+      // Send ban notification email
+      const userForEmail = { email: post.email, username: post.username };
+      await sendBanNotificationEmail(userForEmail, 2);
+    } else {
+      // Send warning email
+      const userForEmail = { email: post.email, username: post.username };
+      await sendWarningEmail(userForEmail, newWarningCount, reason);
+    }
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: banned 
+        ? "Post reported. User has reached 3 warnings and has been banned for 2 hours."
+        : `Post reported. Warning added (${newWarningCount}/3).`,
+      warningCount: newWarningCount,
+      banned: banned,
+      ...(banned && { banDuration: "2 hours" })
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error("❌ Error reporting post:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to report post",
+      error: error.message 
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// --------------------
+// REPORT COMMENT ENDPOINT (Updated for your email service)
+// --------------------
+app.post("/comments/:commentId/report", authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    const reporterId = req.user.id;
+    const commentId = parseInt(req.params.commentId);
+    const { reason } = req.body;
+
+    if (!reason || reason.trim() === '') {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Please provide a reason for reporting" 
+      });
+    }
+
+    await client.query('BEGIN');
+
+    // 1. Get comment and author info
+    const commentResult = await client.query(
+      `SELECT c.*, u.user_id as author_id, u.email, u.username, u.warning_count 
+       FROM comments c
+       JOIN users u ON c.user_id = u.user_id
+       WHERE c.comment_id = $1`,
+      [commentId]
+    );
+
+    if (commentResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ 
+        success: false, 
+        message: "Comment not found" 
+      });
+    }
+
+    const comment = commentResult.rows[0];
+    const reportedUserId = comment.author_id;
+
+    // 2. Prevent self-reporting
+    if (reporterId === reportedUserId) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ 
+        success: false, 
+        message: "You cannot report your own comment" 
+      });
+    }
+
+    // 3. Check if already reported (using post_id field for comment_id)
+    const existingReport = await client.query(
+      `SELECT report_id FROM reports 
+       WHERE post_id = $1 AND user_id = $2 AND status = 'pending'`,
+      [commentId, reporterId]
+    );
+
+    if (existingReport.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ 
+        success: false, 
+        message: "You have already reported this comment" 
+      });
+    }
+
+    // 4. Create report (store comment_id in post_id field)
+    const reportResult = await client.query(
+      `INSERT INTO reports 
+       (post_id, user_id, reported_user_id, reason, created_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       RETURNING *`,
+      [commentId, reporterId, reportedUserId, reason.trim()]
+    );
+
+    // 5. Get current warnings and ban status
+    const userResult = await client.query(
+      `SELECT warning_count, banned_until FROM users WHERE user_id = $1`,
+      [reportedUserId]
+    );
+
+    let currentWarningCount = userResult.rows[0].warning_count;
+    const bannedUntil = userResult.rows[0].banned_until;
+
+    const now = new Date();
+    const isCurrentlyBanned = bannedUntil && new Date(bannedUntil) > now;
+
+    if (isCurrentlyBanned) {
+      await client.query('COMMIT');
+      return res.json({
+        success: true,
+        message: "Comment reported. User is currently banned.",
+        warningCount: currentWarningCount,
+        banned: true
+      });
+    }
+
+    // 6. Increment warning count
+    const newWarningCount = currentWarningCount + 1;
+    
+    await client.query(
+      `UPDATE users SET warning_count = $1 WHERE user_id = $2`,
+      [newWarningCount, reportedUserId]
+    );
+
+    // 7. Check for ban
+    let banned = false;
+    if (newWarningCount >= 3) {
+      const banUntil = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+      await client.query(
+        `UPDATE users SET banned_until = $1 WHERE user_id = $2`,
+        [banUntil, reportedUserId]
+      );
+      banned = true;
+      
+      // Send ban notification email
+      const userForEmail = { email: comment.email, username: comment.username };
+      await sendBanNotificationEmail(userForEmail, 2);
+    } else {
+      // Send warning email
+      const userForEmail = { email: comment.email, username: comment.username };
+      await sendWarningEmail(userForEmail, newWarningCount, reason);
+    }
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: banned 
+        ? "Comment reported. User has reached 3 warnings and has been banned for 2 hours."
+        : `Comment reported. Warning added (${newWarningCount}/3).`,
+      warningCount: newWarningCount,
+      banned: banned,
+      ...(banned && { banDuration: "2 hours" })
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error("❌ Error reporting comment:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to report comment",
+      error: error.message 
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// --------------------
+// BAN CHECK MIDDLEWARE (Simplified for your schema)
+// --------------------
+const checkUserBan = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      return next();
+    }
+
+    // Check if user is banned
+    const userResult = await pool.query(
+      `SELECT username, banned_until FROM users WHERE user_id = $1`,
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return next();
+    }
+
+    const bannedUntil = userResult.rows[0].banned_until;
+    const now = new Date();
+    
+    if (bannedUntil && new Date(bannedUntil) > now) {
+      // User is banned
+      const timeRemaining = new Date(bannedUntil) - now;
+      const hours = Math.floor(timeRemaining / (1000 * 60 * 60));
+      const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+      
+      return res.status(403).json({
+        success: false,
+        message: `Your account is temporarily banned.`,
+        banDetails: {
+          endsAt: bannedUntil,
+          timeRemaining: `${hours}h ${minutes}m`,
+          reason: "Received 3 warnings for community violations"
+        }
+      });
+    }
+    
+    // Auto-reset warnings if ban has expired
+    if (bannedUntil && new Date(bannedUntil) <= now) {
+      await pool.query(
+        `UPDATE users 
+         SET warning_count = 0, banned_until = NULL 
+         WHERE user_id = $1`,
+        [userId]
+      );
+    }
+
+    next();
+  } catch (error) {
+    console.error("❌ Error in ban check middleware:", error);
+    next();
+  }
+};
 // --------------------
 // GET POSTS BY USER ID
 // --------------------
@@ -2574,4 +2926,3 @@ app.listen(PORT, async () => {
 
 
 });
-
