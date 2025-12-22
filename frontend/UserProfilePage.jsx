@@ -177,18 +177,22 @@ export default function UserProfilePage() {
   const [editableUser, setEditableUser] = useState(null);
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
+  const [saving, setSaving] = useState(false);
 
-  // PROGRAM LIST (same as RegisterPage)
   const programs = useMemo(() => PROGRAM_LIST(lang), [lang]);
 
   // Get current user ID from localStorage (set this after login)
   const currentUserId = localStorage.getItem("userId");
-  const isOwnProfile = !userId || userId === currentUserId;
+  
+  // ✅ SMART LOGIC: Determine if we are viewing our own profile
+  const isOwnProfile = !userId || (currentUserId && String(userId) === String(currentUserId));
   const profileUserId = userId || currentUserId;
 
   useEffect(() => {
     const fetchUserProfile = async () => {
       setLoading(true);
+      setErrorMessage(null);
       try {
         const token = localStorage.getItem('token');
         
@@ -198,84 +202,50 @@ export default function UserProfilePage() {
           return;
         }
 
-        console.log("🔍 Token available, fetching profile...");
+        console.log(`🔍 Fetching profile for ID: ${profileUserId} (Own Profile: ${isOwnProfile})`);
+        let fetchedUser = null;
 
-        // If we have a specific user ID from URL, use that endpoint
-        if (userId) {
-          console.log("📝 Fetching specific user:", userId);
-          const response = await fetch(`https://szeconnect.onrender.com/users/${userId}`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          });
-          
-          if (response.ok) {
-            const result = await response.json();
-            if (result.success) {
-              const userData = result.user;
-              
-              // ✅ SIMPLIFIED NORMALIZATION - Use fullname only
-              const normalizedUser = {
-                id: userData.user_id || userData.id,
-                username: userData.username || "",
-                email: userData.email || "",
-                neptun: userData.neptun_code || userData.neptun || "",
-                startYear: userData.start_year || userData.startYear || "",
-                program: userData.major || userData.program || "",
-                birthYear: userData.birthdate ? new Date(userData.birthdate).getFullYear() : userData.birthYear || "",
-                gender: userData.gender || "",
-                bio: userData.bio || "",
-                avatarUrl: userData.profileImage || userData.profile_picture_url || userData.avatarUrl || "",
-                fullName: userData.fullname || userData.fullName || "" // Use fullname only
-              };
-              
-              console.log("🎉 Normalized user data:", normalizedUser);
-              
-              setUser(normalizedUser);
-              setEditableUser(normalizedUser);
-              return;
-            }
+        // 1. FETCH USER PROFILE
+        if (isOwnProfile) {
+          // Case A: Viewing OWN profile -> Use trusted /profile endpoint
+          console.log("👤 Fetching via /profile endpoint (Own Profile)");
+          const result = await api.profile(token);
+          if (result.user) {
+            fetchedUser = normalizeUser(result.user);
+            fetchedUser.isOwnProfile = true; // Mark as own profile
+          }
+        } else {
+          // Case B: Viewing OTHER user -> Use /users/:id endpoint
+          console.log(`📝 Fetching via /users/${profileUserId} endpoint`);
+          const result = await api.getUserProfile(profileUserId, token);
+          if (result.success && result.user) {
+            fetchedUser = normalizeUser(result.user);
+            // Use the backend's isOwnProfile flag or default to false
+            fetchedUser.isOwnProfile = result.user.isOwnProfile || false;
           }
         }
-        
-        // If no specific user ID or user not found, get current user's profile
-        console.log("👤 Fetching current user profile");
-        const response = await fetch('https://szeconnect.onrender.com/profile', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-        
-        if (response.ok) {
-          const result = await response.json();
-          const userData = result.user;
-          console.log("🔍 Raw profile data from /profile:", userData);
-          
-          // ✅ SIMPLIFIED NORMALIZATION - Use fullname only
-          const normalizedUser = {
-            id: userData.user_id || userData.id,
-            username: userData.username || "",
-            email: userData.email || "",
-            neptun: userData.neptun || userData.neptun_code || "",
-            startYear: userData.startYear || userData.start_year || "",
-            program: userData.major || userData.program || "",
-            birthYear: userData.birthdate ? new Date(userData.birthdate).getFullYear() : userData.birthYear || "",
-            gender: userData.gender || "",
-            bio: userData.bio || "",
-            avatarUrl: userData.profile_picture_url || userData.profileImage || userData.avatarUrl || "",
-            fullName: userData.fullName || userData.fullname || "" // Use fullname only
-          };
-          
-          setUser(normalizedUser);
-          setEditableUser(normalizedUser);
+
+        if (fetchedUser) {
+          setUser(fetchedUser);
+          setEditableUser({
+            ...fetchedUser,
+            password: "",
+            confirmPassword: "",
+            newProfileImage: null
+          });
+
+          // 2. FETCH USER POSTS
+          const postsData = await api.getUserPosts(fetchedUser.id, token);
+          if (postsData.success) {
+            setPosts(postsData.posts);
+          }
         } else {
-          throw new Error(`Failed to fetch profile: ${response.status}`);
+          setErrorMessage("User not found or deleted.");
         }
         
       } catch (error) {
         console.error("❌ Error fetching profile:", error);
+        setErrorMessage(error.message || "Failed to load profile.");
         setUser(null);
       } finally {
         setLoading(false);
@@ -283,7 +253,139 @@ export default function UserProfilePage() {
     };
 
     fetchUserProfile();
-  }, [profileUserId, userId]);
+  }, [profileUserId, isOwnProfile]);
+
+  // Helper to standardize user object structure
+  const normalizeUser = (userData) => ({
+    id: userData.user_id || userData.id,
+    username: userData.username || "",
+    email: userData.email || "",
+    neptun: userData.neptun_code || userData.neptun || "",
+    startYear: userData.start_year || userData.startYear || "",
+    program: userData.major || userData.program || "",
+    birthYear: userData.birthdate ? new Date(userData.birthdate).getFullYear() : userData.birthYear || "",
+    gender: userData.gender || "",
+    bio: userData.bio || "",
+    avatarUrl: userData.profileImage || userData.profile_picture_url || userData.avatarUrl || "",
+    fullName: userData.fullname || userData.fullName || "",
+    isOwnProfile: userData.isOwnProfile || isOwnProfile
+  });
+
+  // Handle saving profile changes
+  const handleSaveProfile = async () => {
+    console.log("🟢 Saving profile changes...");
+    setSaving(true);
+    
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        alert(lang === "hu" ? "Bejelentkezés szükséges" : "Please login first");
+        setSaving(false);
+        return;
+      }
+
+      // Create FormData for the update
+      const formData = new FormData();
+      
+      // Track changes
+      let hasChanges = false;
+      
+      // Add changed fields
+      if (editableUser.username && editableUser.username !== user.username) {
+        formData.append("username", editableUser.username.trim());
+        console.log("📝 Username changed:", editableUser.username);
+        hasChanges = true;
+      }
+      
+      if (editableUser.bio !== undefined && editableUser.bio !== user.bio) {
+        formData.append("bio", editableUser.bio || "");
+        console.log("📝 Bio changed:", editableUser.bio);
+        hasChanges = true;
+      }
+      
+      if (editableUser.fullName && editableUser.fullName !== user.fullName) {
+        formData.append("fullName", editableUser.fullName.trim());
+        console.log("📝 Full name changed:", editableUser.fullName);
+        hasChanges = true;
+      }
+      
+      if (editableUser.password && editableUser.password.trim() !== "") {
+        if (editableUser.password === editableUser.confirmPassword) {
+          formData.append("password", editableUser.password);
+          console.log("🔑 Password changed");
+          hasChanges = true;
+        } else {
+          alert(lang === "hu" ? "A jelszavak nem egyeznek!" : "Passwords don't match!");
+          setSaving(false);
+          return;
+        }
+      }
+      
+      // Handle profile picture if changed
+      if (editableUser.newProfileImage) {
+        formData.append("profileImage", editableUser.newProfileImage);
+        console.log("📸 Image file attached:", editableUser.newProfileImage.name);
+        hasChanges = true;
+      }
+      
+      // Check if there are any changes
+      if (!hasChanges) {
+        console.log("ℹ️ No changes to save");
+        setEditMode(false);
+        setSaving(false);
+        return;
+      }
+      
+      console.log("📤 Sending profile update...");
+      console.log("FormData entries:", Array.from(formData.entries()));
+      
+      const response = await api.updateProfile(formData, token);
+      
+      console.log("📥 API Response:", response);
+      
+      if (response.success) {
+        console.log("✅ Profile updated successfully!");
+        alert(lang === "hu" ? "✅ Profil sikeresen frissítve!" : "✅ Profile updated successfully!");
+        
+        // Update local state with the server response
+        const updatedUser = {
+          ...user,
+          username: response.user?.username || editableUser.username,
+          bio: response.user?.bio || editableUser.bio,
+          fullName: response.user?.fullName || editableUser.fullName,
+          avatarUrl: response.user?.profileImage || editableUser.avatarUrl
+        };
+        
+        setUser(updatedUser);
+        setEditableUser({
+          ...updatedUser,
+          password: "",
+          confirmPassword: "",
+          newProfileImage: null
+        });
+        
+        setEditMode(false);
+        
+        // Refresh the page data
+        try {
+          const freshData = await api.profile(token);
+          if (freshData.user) {
+            setUser(normalizeUser(freshData.user));
+          }
+        } catch (refreshError) {
+          console.log("ℹ️ Could not refresh data, but update was successful");
+        }
+        
+      } else {
+        alert(response.message || (lang === "hu" ? "Hiba a mentéskor" : "Failed to update profile"));
+      }
+    } catch (error) {
+      console.error("❌ Failed to update profile:", error);
+      alert(error.message || (lang === "hu" ? "Nem sikerült frissíteni a profilt" : "Failed to update profile"));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const t = useMemo(() => {
     const hu = {
@@ -306,7 +408,11 @@ export default function UserProfilePage() {
       postCount: "Bejegyzések száma",
       createPost: "Új bejegyzés",
       newGroup: "Új csoport",
-      postsTitle: "Bejegyzések"
+      postsTitle: "Bejegyzések",
+      save: "Mentés",
+      cancel: "Mégse",
+      saving: "Mentés...",
+      privateInfo: "Privát információ"
     };
 
     const en = {
@@ -329,112 +435,82 @@ export default function UserProfilePage() {
       postCount: "Number of posts",
       createPost: "Create post",
       newGroup: "New group",
-      postsTitle: "Posts"
+      postsTitle: "Posts",
+      save: "Save",
+      cancel: "Cancel",
+      saving: "Saving...",
+      privateInfo: "Private information"
     };
 
     return lang === "hu" ? hu : en;
   }, [lang]);
 
   if (loading) return <Skeleton />;
-  if (!user) return <div className="p-6">{lang === "hu" ? "Felhasználó nem található." : "User not found."}</div>;
+  
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#FDFDFE] flex flex-col items-center justify-center p-6">
+        <div className="bg-white p-8 rounded-2xl shadow-sm border border-[#1F3351]/10 text-center max-w-md">
+          <div className="w-16 h-16 bg-[#EDF5FA] rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-3xl">⚠️</span>
+          </div>
+          <h2 className="text-2xl font-bold text-[#1F3351] mb-2">
+            {lang === "hu" ? "Felhasználó nem található" : "User Not Found"}
+          </h2>
+          <p className="text-[#1F3351]/70 mb-6">
+            {errorMessage || (lang === "hu" ? "A keresett profil nem létezik vagy törölve lett." : "The profile you are looking for does not exist or has been deleted.")}
+          </p>
+          <button 
+            onClick={() => navigate("/home")}
+            className="w-full rounded-xl bg-[#E1860E] text-white font-semibold py-3 hover:opacity-90 transition"
+          >
+            {lang === "hu" ? "Vissza a főoldalra" : "Back to Home"}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#FDFDFE] flex flex-col">
       {/* HEADER */}
       <header className="flex items-center justify-between px-4 sm:px-6 md:px-10 py-4 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
-        {/* Logo + Brand (always visible) */}
-        <button
-          onClick={() => navigate("/home")}
-          className="flex items-center gap-2 sm:gap-3 focus:outline-none hover:opacity-90 transition"
-          title="Go to Home"
-        >
+        <button onClick={() => navigate("/home")} className="flex items-center gap-2 sm:gap-3 focus:outline-none hover:opacity-90 transition" title="Go to Home">
           <LogoShare className="w-8 h-8 sm:w-10 sm:h-10" />
           <span className="text-xl sm:text-2xl font-bold whitespace-nowrap">{t.brand}</span>
         </button>
 
-        {/* Desktop buttons */}
         <div className="hidden md:flex items-center gap-4">
-          <button
-            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
-            className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
-          >
+          <button onClick={() => setLang(lang === "hu" ? "en" : "hu")} className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90">
             {lang === "hu" ? "EN" : "HU"}
           </button>
-
-          <button
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
-            title={t.info}
-            onClick={() => navigate("/info")}
-          >
+          <button className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]" title={t.info} onClick={() => navigate("/info")}>
             i
           </button>
-
-          <button
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
-            title={t.profile}
-            onClick={() => navigate("/profile")}
-          >
+          <button className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]" title={t.profile} onClick={() => navigate("/profile")}>
             👤
           </button>
-
-          <button
-            className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
-            onClick={() => navigate("/login")}
-          >
+          <button className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90" onClick={() => navigate("/login")}>
             {t.logout}
           </button>
         </div>
 
-        {/* Mobile Hamburger */}
         <div className="md:hidden relative">
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="w-10 h-10 rounded-md bg-[#E1860E] text-white text-2xl font-bold flex items-center justify-center shadow hover:opacity-90"
-            aria-label="Toggle menu"
-          >
+          <button onClick={() => setMenuOpen(!menuOpen)} className="w-10 h-10 rounded-md bg-[#E1860E] text-white text-2xl font-bold flex items-center justify-center shadow hover:opacity-90" aria-label="Toggle menu">
             {menuOpen ? "×" : "☰"}
           </button>
-
-          {/* Dropdown */}
           {menuOpen && (
             <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
-              <button
-                onClick={() => {
-                  setLang(lang === "hu" ? "en" : "hu");
-                  setMenuOpen(false);
-                }}
-                className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
-              >
+              <button onClick={() => { setLang(lang === "hu" ? "en" : "hu"); setMenuOpen(false); }} className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]">
                 🌐 {lang === "hu" ? "EN" : "HU"}
               </button>
-
-              <button
-                onClick={() => {
-                  navigate("/info");
-                  setMenuOpen(false);
-                }}
-                className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
-              >
+              <button onClick={() => { navigate("/info"); setMenuOpen(false); }} className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]">
                 ℹ️ {t.info}
               </button>
-
-              <button
-                onClick={() => {
-                  navigate("/profile");
-                  setMenuOpen(false);
-                }}
-                className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
-              >
+              <button onClick={() => { navigate("/profile"); setMenuOpen(false); }} className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]">
                 👤 {t.profile}
               </button>
-
-              <button
-                onClick={() => {
-                  navigate("/login");
-                  setMenuOpen(false);
-                }}
-                className="w-full text-left px-4 py-2 font-semibold text-[#E1860E] hover:bg-[#EDF5FA]"
-              >
+              <button onClick={() => { navigate("/login"); setMenuOpen(false); }} className="w-full text-left px-4 py-2 font-semibold text-[#E1860E] hover:bg-[#EDF5FA]">
                 🚪 {t.logout}
               </button>
             </div>
@@ -446,7 +522,6 @@ export default function UserProfilePage() {
       <main className="flex-1 px-10 py-8 space-y-8">
         {/* USER HEADER */}
         <div className="flex flex-wrap items-center justify-between gap-6">
-          {/* LEFT: Avatar + username */}
           <div className="flex items-center gap-6">
             <div className="relative flex flex-col items-center">
               <div className="w-32 h-32 rounded-full bg-[#EDF5FA] border-4 border-[#1F3351] flex items-center justify-center overflow-hidden">
@@ -472,11 +547,13 @@ export default function UserProfilePage() {
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) {
+                        console.log("📸 Selected file:", file.name, file.size);
                         const reader = new FileReader();
                         reader.onloadend = () => {
                           setEditableUser({
                             ...editableUser,
                             avatarUrl: reader.result,
+                            newProfileImage: file
                           });
                         };
                         reader.readAsDataURL(file);
@@ -499,7 +576,7 @@ export default function UserProfilePage() {
           </div>
 
           {/* RIGHT: Edit or Save/Cancel buttons */}
-          {isOwnProfile && (
+          {user.isOwnProfile && (
             !editMode ? (
               <button
                 onClick={() => setEditMode(true)}
@@ -510,23 +587,35 @@ export default function UserProfilePage() {
             ) : (
               <div className="flex gap-3">
                 <button
-                  onClick={() => {
-                    setUser(editableUser);
-                    setEditMode(false);
-                  }}
-                  className="rounded-lg bg-[#E1860E] text-white px-6 py-2 font-semibold shadow hover:bg-[#cf760c]"
+                  onClick={handleSaveProfile}
+                  disabled={saving}
+                  className="rounded-lg bg-[#E1860E] text-white px-6 py-2 font-semibold shadow hover:bg-[#cf760c] disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  {lang === "hu" ? "Mentés" : "Save"}
+                  {saving ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      {t.saving}
+                    </>
+                  ) : t.save}
                 </button>
 
                 <button
                   onClick={() => {
-                    setEditableUser(user);
+                    setEditableUser({
+                      ...user,
+                      password: "",
+                      confirmPassword: "",
+                      newProfileImage: null
+                    });
                     setEditMode(false);
                   }}
-                  className="rounded-lg bg-gray-400 text-white px-6 py-2 font-semibold shadow hover:bg-gray-500"
+                  disabled={saving}
+                  className="rounded-lg bg-gray-400 text-white px-6 py-2 font-semibold shadow hover:bg-gray-500 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
-                  {lang === "hu" ? "Mégse" : "Cancel"}
+                  {t.cancel}
                 </button>
               </div>
             )
@@ -539,9 +628,10 @@ export default function UserProfilePage() {
             {editMode ? (
               <textarea
                 rows={3}
-                className="w-full border border-[#1F3351]/40 rounded-lg p-2 text-[#1F3351]"
-                value={editableUser.bio}
+                className="w-full border border-[#1F3351]/40 rounded-lg p-2 text-[#1F3351] bg-white"
+                value={editableUser.bio || ""}
                 onChange={(e) => setEditableUser({ ...editableUser, bio: e.target.value })}
+                placeholder={lang === "hu" ? "Írd le magad röviden..." : "Tell us about yourself..."}
               />
             ) : user.bio ? (
               <p className="text-[#1F3351] leading-relaxed whitespace-pre-wrap">{user.bio}</p>
@@ -563,7 +653,7 @@ export default function UserProfilePage() {
                 onChange={(e) =>
                   setEditableUser({ ...editableUser, fullName: e.target.value })
                 }
-                className="w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] text-[#1F3351] placeholder:text-[#1F3351]/70 border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
+                className="w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-white text-[#1F3351] placeholder:text-[#1F3351]/70 border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
                 placeholder={lang === "hu" ? "Teljes név" : "Full name"}
               />
             ) : (
@@ -581,7 +671,9 @@ export default function UserProfilePage() {
                 onChange={(e) =>
                   setEditableUser({ ...editableUser, username: e.target.value })
                 }
-                className="w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] text-[#1F3351] placeholder:text-[#1F3351]/70 border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
+                className="w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-white text-[#1F3351] placeholder:text-[#1F3351]/70 border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
+                placeholder={lang === "hu" ? "Felhasználónév" : "Username"}
+                minLength="3"
               />
             ) : (
               <span className="font-medium">{user.username || "—"}</span>
@@ -590,30 +682,7 @@ export default function UserProfilePage() {
 
           <div>
             <label className="font-bold block mb-1">{t.program}:</label>
-
-            {editMode ? (
-              <select
-                value={editableUser.program || ""}
-                onChange={(e) =>
-                  setEditableUser({ ...editableUser, program: e.target.value })
-                }
-                className="w-full rounded-xl border-2 px-4 py-3 text-base bg-[#EDF5FA] border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-4 focus:ring-[#E1860E]/30 text-[#1F3351]"
-              >
-                <option value="">
-                  {lang === "hu" ? "Válassz szakot…" : "Select a major…"}
-                </option>
-
-                {programs.map((grp) => (
-                  <optgroup key={grp.group} label={grp.group}>
-                    {grp.options.map((op) => (
-                      <option key={op} value={op}>{op}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            ) : (
-              <span className="font-medium">{user.program || "—"}</span>
-            )}
+            <span className="font-medium">{user.program || "—"}</span>
           </div>
 
           {/* Dropdown helpers */}
@@ -658,7 +727,8 @@ export default function UserProfilePage() {
                             password: e.target.value,
                           })
                         }
-                        className="w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] text-[#1F3351] placeholder:text-[#1F3351]/70 border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
+                        className="w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-white text-[#1F3351] placeholder:text-[#1F3351]/70 border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
+                        minLength="6"
                       />
                     </div>
 
@@ -679,7 +749,8 @@ export default function UserProfilePage() {
                             confirmPassword: e.target.value,
                           })
                         }
-                        className="w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] text-[#1F3351] placeholder:text-[#1F3351]/70 border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
+                        className="w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-white text-[#1F3351] placeholder:text-[#1F3351]/70 border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
+                        minLength="6"
                       />
                     </div>
                   </>
@@ -688,37 +759,30 @@ export default function UserProfilePage() {
                 {/* Row 5: Gender / Email */}
                 <div>
                   <label className="font-bold block mb-1">{t.gender}:</label>
-                  {editMode ? (
-                    <select
-                      value={editableUser.gender || ""}
-                      onChange={(e) =>
-                        setEditableUser({ ...editableUser, gender: e.target.value })
-                      }
-                      className="w-full rounded-lg border border-[#1F3351]/30 p-2 bg-white"
-                    >
-                      <option value="">
-                        {lang === "hu" ? "Válassz nemet..." : "Select gender..."}
-                      </option>
-                      {genderOptions.map((g) => (
-                        <option key={g} value={g}>
-                          {g}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span className="font-medium">{user.gender || "—"}</span>
-                  )}
+                  <span className="font-medium">{user.gender || "—"}</span>
                 </div>
 
                 <div>
                   <label className="font-bold block mb-1">{t.email}:</label>
-                  <span className="font-medium">{user.email || "—"}</span>
+                  {user.isOwnProfile ? (
+                    <span className="font-medium">{user.email || "—"}</span>
+                  ) : (
+                    <span className="font-medium text-[#1F3351]/50 italic">
+                      {t.privateInfo}
+                    </span>
+                  )}
                 </div>
 
-                {/* Row 6: Neptun (locked) / empty spacer */}
+                {/* Row 6: Neptun (only for own profile) / empty spacer */}
                 <div>
                   <label className="font-bold block mb-1">{t.neptun}:</label>
-                  <span className="font-medium">{user.neptun || "—"}</span>
+                  {user.isOwnProfile ? (
+                    <span className="font-medium">{user.neptun || "—"}</span>
+                  ) : (
+                    <span className="font-medium text-[#1F3351]/50 italic">
+                      {t.privateInfo}
+                    </span>
+                  )}
                 </div>
 
                 <div>{/* empty cell to keep grid even */}</div>
@@ -756,7 +820,7 @@ export default function UserProfilePage() {
                     <div className="flex items-center justify-between">
                       <div className="truncate">
                         <Link
-                          to={`/users/${p.userId || "usr-demo"}`}
+                          to={`/users/${p.userId || p.authorId || 0}`}
                           className="font-bold text-[#1F3351] hover:underline hover:text-[#E1860E] transition"
                         >
                           {p.authorName || user.fullName || user.username}
