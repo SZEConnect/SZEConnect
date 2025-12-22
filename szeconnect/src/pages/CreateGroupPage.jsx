@@ -1,20 +1,25 @@
 import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { api } from "../lib/api"; // ✅ Import the API helper
 
 export default function CreateGroupPage() {
   const navigate = useNavigate();
   const fileRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  
+  // ADD THIS: Popup state
+  const [popup, setPopup] = useState({ show: false, type: "success", message: "" });
+  
+  // ADD THIS: Function to show popup
+  const showPopup = (type, message) => {
+    setPopup({ show: true, type, message });
+    setTimeout(() => {
+      setPopup({ show: false, type, message: "" });
+    }, 3000);
+  };
 
-
-  //  i18n 
-  const [lang, setLang] = useState(() => localStorage.getItem("lang") || "hu");
-  const toggleLang = () => {
-  const newLang = lang === "hu" ? "en" : "hu";
-  setLang(newLang);
-  localStorage.setItem("lang", newLang);
-};
-
+  // i18n 
+  const [lang, setLang] = useState("hu");
   const t = useMemo(() => {
     const hu = {
       brand: "SzeConnect",
@@ -30,13 +35,21 @@ export default function CreateGroupPage() {
       info: "Információ",
       profile: "Profil",
       logout: "Kijelentkezés",
+      loading: "Létrehozás...",
+      error: "Hiba történt a létrehozáskor",
+      // ADD POPUP MESSAGES
+      success: "Csoport sikeresen létrehozva!",
+      loginRequired: "Bejelentkezés szükséges a csoport létrehozásához",
+      imageTooLarge: "A kép túl nagy (max 4MB)",
+      creationError: "Hiba történt a csoport létrehozása során",
+      nameRequired: "Csoport név megadása kötelező"
     };
     const en = {
       brand: "SzeConnect",
       title: "Create Group",
       nameLabel: "Group name",
       namePh: "Group name…",
-      bioLabel: "What’s the group about? (Bio)",
+      bioLabel: "What's the group about? (Bio)",
       cancel: "Cancel",
       create: "Create Group",
       addImage: "Upload image",
@@ -45,20 +58,31 @@ export default function CreateGroupPage() {
       info: "Information",
       profile: "Profile",
       logout: "Logout",
+      loading: "Creating...",
+      error: "Error creating group",
+      // ADD POPUP MESSAGES
+      success: "Group created successfully!",
+      loginRequired: "Login required to create a group",
+      imageTooLarge: "Image too large (max 4MB)",
+      creationError: "Error creating group",
+      nameRequired: "Group name is required"
     };
     return lang === "hu" ? hu : en;
   }, [lang]);
 
-  //  state 
+  // state 
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
   const [errors, setErrors] = useState({});
   const [image, setImage] = useState(null); // { file, url }
+  const [loading, setLoading] = useState(false); // ✅ Add loading state
 
   const onPickImage = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 4 * 1024 * 1024) {
+      // CHANGE: Replace error state with popup
+      showPopup("error", t.imageTooLarge);
       setErrors((p) => ({ ...p, image: t.tooBig }));
       return;
     }
@@ -74,131 +98,198 @@ export default function CreateGroupPage() {
 
   const validate = () => {
     const e = {};
-    if (!name.trim()) e.name = t.required;
+    if (!name.trim()) {
+      e.name = t.required;
+      // ADD: Show popup for validation error
+      showPopup("error", t.nameRequired);
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  const onSubmit = (e) => {
+  // ✅ MODIFY SUBMIT HANDLER
+  const onSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
 
-    const payload = {
-      name: name.trim(),
-      bio: bio.trim(),
-      image: image?.file ?? null,
-    };
-    console.log("CREATE GROUP →", payload);
+    setLoading(true);
+    setErrors({});
 
-    navigate("/groups/grp-new");
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        // CHANGE: Replace alert with popup
+        showPopup("error", t.loginRequired);
+        navigate("/login");
+        return;
+      }
+
+      // 1. Create FormData (Required for file uploads)
+      const formData = new FormData();
+      formData.append("name", name.trim());
+      // Backend expects 'description', frontend uses 'bio'
+      formData.append("description", bio.trim()); 
+      
+      // 2. Append image if it exists
+      // 'image' matches upload.single('image') in backend
+      if (image?.file) {
+        formData.append("image", image.file);
+      }
+
+      // 3. Send to Backend
+      const result = await api.createGroup(formData, token);
+
+      if (result.success) {
+        // ADD: Show success popup
+        showPopup("success", t.success);
+        
+        // Clean up image URL if exists
+        if (image?.url) {
+          URL.revokeObjectURL(image.url);
+        }
+        
+        // Navigate to the new group after popup is shown
+        setTimeout(() => {
+          navigate(`/groups/${result.group.id}`);
+        }, 1500);
+      }
+
+    } catch (err) {
+      console.error("Failed to create group:", err);
+      // CHANGE: Replace error state with popup
+      const errorMessage = err.message || t.creationError;
+      showPopup("error", errorMessage);
+      
+      // Also keep the error state for form display if needed
+      setErrors((prev) => ({ 
+        ...prev, 
+        submit: errorMessage 
+      }));
+    } finally {
+      setLoading(false);
+    }
   };
 
-  //  render 
+  // render 
   return (
     <div className="min-h-screen bg-[#FDFDFE] flex flex-col">
-    {/* HEADER */}
-    <header className="flex items-center justify-between px-4 sm:px-6 md:px-10 py-4 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
-      {/* Logo + Brand (always visible) */}
-      <button
-        onClick={() => navigate("/home")}
-        className="flex items-center gap-2 sm:gap-3 focus:outline-none hover:opacity-90 transition"
-        title="Go to Home"
-      >
-        <LogoShare className="w-8 h-8 sm:w-10 sm:h-10" />
-        <span className="text-xl sm:text-2xl font-bold whitespace-nowrap">{t.brand}</span>
-      </button>
-
-      {/* Desktop buttons */}
-      <div className="hidden md:flex items-center gap-4">
-        <button
-          onClick={toggleLang}
-          className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
+      {/* ADD THE POPUP COMPONENT */}
+      {popup.show && (
+        <div
+          className={`
+            fixed top-8 left-1/2 -translate-x-1/2 z-[9999]
+            px-6 py-4 rounded-xl shadow-lg border
+            text-white font-semibold transition-all duration-300
+            ${popup.type === "success" 
+              ? "bg-[#2A3F5B] border-[#E1860E]" 
+              : "bg-red-600 border-red-300"}
+          `}
         >
-          {lang === "hu" ? "EN" : "HU"}
+          {popup.message}
+        </div>
+      )}
+
+      {/* HEADER */}
+      <header className="flex items-center justify-between px-4 sm:px-6 md:px-10 py-4 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
+        {/* Logo + Brand (always visible) */}
+        <button
+          onClick={() => navigate("/home")}
+          className="flex items-center gap-2 sm:gap-3 focus:outline-none hover:opacity-90 transition"
+          title="Go to Home"
+        >
+          <LogoShare className="w-8 h-8 sm:w-10 sm:h-10" />
+          <span className="text-xl sm:text-2xl font-bold whitespace-nowrap">{t.brand}</span>
         </button>
 
-        <button
-          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
-          title={t.info}
-          onClick={() => navigate("/info")}
-        >
-          i
-        </button>
+        {/* Desktop buttons */}
+        <div className="hidden md:flex items-center gap-4">
+          <button
+            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
+            className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
+          >
+            {lang === "hu" ? "EN" : "HU"}
+          </button>
 
-        <button
-          className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
-          title={t.profile}
-          onClick={() => navigate("/profile")}
-        >
-          👤
-        </button>
+          <button
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:bg-[#f9f9f9]"
+            title={t.info}
+            onClick={() => navigate("/info")}
+          >
+            i
+          </button>
 
-        <button
-          className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
-          onClick={() => navigate("/login")}
-        >
-          {t.logout}
-        </button>
-      </div>
+          <button
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-base shadow hover:bg-[#f9f9f9]"
+            title={t.profile}
+            onClick={() => navigate("/profile")}
+          >
+            👤
+          </button>
 
-      {/* Mobile Hamburger */}
-      <div className="md:hidden relative">
-        <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="w-10 h-10 rounded-md bg-[#E1860E] text-white text-2xl font-bold flex items-center justify-center shadow hover:opacity-90"
-          aria-label="Toggle menu"
-        >
-          {menuOpen ? "×" : "☰"}
-        </button>
+          <button
+            className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
+            onClick={() => navigate("/login")}
+          >
+            {t.logout}
+          </button>
+        </div>
 
-        {/* Dropdown */}
-        {menuOpen && (
-          <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
-            <button
-              onClick={() => {
-                toggleLang();
-                setMenuOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
-            >
-              🌐 {lang === "hu" ? "EN" : "HU"}
-            </button>
+        {/* Mobile Hamburger */}
+        <div className="md:hidden relative">
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="w-10 h-10 rounded-md bg-[#E1860E] text-white text-2xl font-bold flex items-center justify-center shadow hover:opacity-90"
+            aria-label="Toggle menu"
+          >
+            {menuOpen ? "×" : "☰"}
+          </button>
 
-            <button
-              onClick={() => {
-                navigate("/info");
-                setMenuOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
-            >
-              ℹ️ {t.info}
-            </button>
+          {/* Dropdown */}
+          {menuOpen && (
+            <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
+              <button
+                onClick={() => {
+                  setLang(lang === "hu" ? "en" : "hu");
+                  setMenuOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+              >
+                🌐 {lang === "hu" ? "EN" : "HU"}
+              </button>
 
-            <button
-              onClick={() => {
-                navigate("/profile");
-                setMenuOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
-            >
-              👤 {t.profile}
-            </button>
+              <button
+                onClick={() => {
+                  navigate("/info");
+                  setMenuOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+              >
+                ℹ️ {t.info}
+              </button>
 
-            <button
-              onClick={() => {
-                navigate("/login");
-                setMenuOpen(false);
-              }}
-              className="w-full text-left px-4 py-2 font-semibold text-[#E1860E] hover:bg-[#EDF5FA]"
-            >
-              🚪 {t.logout}
-            </button>
-          </div>
-        )}
-      </div>
-    </header>
+              <button
+                onClick={() => {
+                  navigate("/profile");
+                  setMenuOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
+              >
+                👤 {t.profile}
+              </button>
 
-
+              <button
+                onClick={() => {
+                  navigate("/login");
+                  setMenuOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 font-semibold text-[#E1860E] hover:bg-[#EDF5FA]"
+              >
+                🚪 {t.logout}
+              </button>
+            </div>
+          )}
+        </div>
+      </header>
 
       {/* MAIN SECTION */}
       <main className="flex-1 px-10 py-12">
@@ -210,6 +301,13 @@ export default function CreateGroupPage() {
           onSubmit={onSubmit}
           className="max-w-6xl mx-auto bg-white border border-[#1F3351]/10 rounded-2xl shadow-lg p-10 space-y-10"
         >
+          {/* Global Error Display */}
+          {errors.submit && (
+            <div className="bg-red-100 text-red-700 p-3 rounded-lg text-center">
+              {errors.submit}
+            </div>
+          )}
+
           {/* IMAGE + NAME SECTION */}
           <div className="flex flex-col md:flex-row items-center md:items-start gap-10">
             {/* Image Upload */}
@@ -298,24 +396,16 @@ export default function CreateGroupPage() {
                   : "border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
               }`}
             />
-
           </div>
 
           {/* BUTTONS */}
           <div className="flex justify-center pt-4">
-            {/* <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="rounded-xl bg-[#6C8EBF] text-white font-semibold px-8 py-3 shadow hover:opacity-90"
-            >
-              {t.cancel}
-            </button> */}
-
             <button
               type="submit"
-              className="rounded-xl bg-[#E1860E] text-white font-semibold px-10 py-3 shadow hover:opacity-95"
+              disabled={loading}
+              className="rounded-xl bg-[#E1860E] text-white font-semibold px-10 py-3 shadow hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {t.create}
+              {loading ? t.loading : t.create}
             </button>
           </div>
         </form>

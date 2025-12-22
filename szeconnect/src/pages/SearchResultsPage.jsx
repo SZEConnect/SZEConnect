@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 
 export default function SearchResultsPage() {
-  const [lang, setLang] = useState(() => localStorage.getItem("lang") || "hu");
+  const [lang, setLang] = useState("hu");
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -14,13 +14,6 @@ export default function SearchResultsPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
-  const toggleLang = () => {
-  const newLang = lang === "hu" ? "en" : "hu";
-  setLang(newLang);
-  localStorage.setItem("lang", newLang);
-};
-
 
   const t = useMemo(() => {
     const hu = {
@@ -59,6 +52,7 @@ export default function SearchResultsPage() {
   // Fetch search results
   useEffect(() => {
     const fetchSearchResults = async () => {
+      // If query is empty, clear results and stop
       if (!q.trim()) {
         setGroups([]);
         setUsers([]);
@@ -76,13 +70,15 @@ export default function SearchResultsPage() {
           api.searchUsers(q)
         ]);
 
-        if (groupsResponse.success) {
+        // Handle Groups Response
+        if (groupsResponse && groupsResponse.success) {
           setGroups(groupsResponse.groups || []);
         } else {
           setGroups([]);
         }
 
-        if (usersResponse.success) {
+        // Handle Users Response
+        if (usersResponse && usersResponse.success) {
           setUsers(usersResponse.users || []);
         } else {
           setUsers([]);
@@ -90,7 +86,7 @@ export default function SearchResultsPage() {
 
       } catch (err) {
         console.error("Search error:", err);
-        setError(err.message);
+        setError(err.message || "An error occurred during search");
         setGroups([]);
         setUsers([]);
       } finally {
@@ -105,6 +101,13 @@ export default function SearchResultsPage() {
     e.preventDefault();
     const query = q ? `?q=${encodeURIComponent(q)}` : "";
     navigate(`/search${query}`);
+  };
+
+  // Helper for broken images
+  const handleImageError = (e) => {
+    e.target.style.display = 'none';
+    // Show parent div's fallback icon
+    e.target.parentElement.classList.add('fallback-mode');
   };
 
   return (
@@ -124,7 +127,7 @@ export default function SearchResultsPage() {
         {/* Desktop buttons */}
         <div className="hidden md:flex items-center gap-4">
           <button
-            onClick={toggleLang}
+            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
             className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
           >
             {lang === "hu" ? "EN" : "HU"}
@@ -169,7 +172,7 @@ export default function SearchResultsPage() {
             <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
               <button
                 onClick={() => {
-                  toggleLang();
+                  setLang(lang === "hu" ? "en" : "hu");
                   setMenuOpen(false);
                 }}
                 className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
@@ -212,10 +215,10 @@ export default function SearchResultsPage() {
       </header>
 
       {/* CONTENT */}
-      <main className="flex-1 px-10 py-12">
+      <main className="flex-1 px-4 sm:px-10 py-12">
         <div className="max-w-6xl mx-auto space-y-10">
           {/* PAGE TITLE */}
-          <h1 className="text-4xl font-bold mb-6">{t.title}</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold mb-6">{t.title}</h1>
 
           {/* SEARCH BAR */}
           <form onSubmit={onSubmit} className="flex gap-3 items-center">
@@ -255,6 +258,7 @@ export default function SearchResultsPage() {
                         to={`/groups/${group.id}`}
                         title={group.name}
                         subtitle={`${group.memberCount} ${t.members}`}
+                        imageUrl={group.imageUrl} /* Pass Image URL */
                       >
                         {group.description}
                       </ResultCard>
@@ -276,6 +280,7 @@ export default function SearchResultsPage() {
                         to={`/users/${user.id}`}
                         title={user.fullName || user.username}
                         subtitle={`@${user.username} · ${user.major || 'No major'}`}
+                        imageUrl={user.profileImage || user.profile_picture_url} /* Pass Image URL */
                       />
                     ))}
                   </div>
@@ -344,15 +349,31 @@ export default function SearchResultsPage() {
 }
 
 /* ---- Components ---- */
-function ResultCard({ to = "#", title, subtitle, children }) {
+function ResultCard({ to = "#", title, subtitle, imageUrl, children }) {
   return (
     <Link
       to={to}
       className="block rounded-2xl border-2 border-[#C9D6E2] bg-[#F4F7FB] px-5 py-4 shadow-sm hover:shadow-md hover:translate-y-[-1px] transition"
     >
       <div className="flex items-center gap-4">
-        <div className="w-12 h-12 shrink-0 rounded-full bg-white border-2 border-[#A5B6C8] flex items-center justify-center">
-          <UserIcon className="w-7 h-7" />
+        <div className="w-12 h-12 shrink-0 rounded-full bg-white border-2 border-[#A5B6C8] flex items-center justify-center overflow-hidden">
+          {imageUrl ? (
+            <img 
+              src={imageUrl} 
+              alt={title} 
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.parentElement.querySelector('.fallback-icon').style.display = 'block';
+              }}
+            />
+          ) : (
+             <UserIcon className="w-7 h-7" />
+          )}
+          {/* Hidden fallback icon for when image fails loading */}
+          <div className="fallback-icon hidden absolute">
+            <UserIcon className="w-7 h-7" />
+          </div>
         </div>
         <div className="min-w-0">
           <h3 className="text-[#1F3351] font-bold truncate">{title}</h3>
@@ -376,7 +397,12 @@ function EmptyBox({ text }) {
 function LogoShare({ className = "" }) {
   return (
     <svg viewBox="0 0 400 400" className={className} role="img" aria-label="SzeConnect logo">
-      <circle cx="200" cy="200" r="185" fill="none" stroke="#FFFFFF" strokeWidth="30" />
+      <defs>
+        <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="6" stdDeviation="6" floodOpacity="0.25" />
+        </filter>
+      </defs>
+      <circle cx="200" cy="200" r="185" fill="none" stroke="#FFFFFF" strokeWidth="30" filter="url(#softShadow)" />
       <line x1="120" y1="206" x2="248" y2="125" stroke="#FFFFFF" strokeWidth="26" strokeLinecap="round" />
       <line x1="120" y1="206" x2="248" y2="279" stroke="#FFFFFF" strokeWidth="26" strokeLinecap="round" />
       <circle cx="120" cy="206" r="41" fill="#E1860E" stroke="#FFFFFF" strokeWidth="6" />

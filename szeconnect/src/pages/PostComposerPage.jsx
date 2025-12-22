@@ -8,22 +8,9 @@ export default function PostComposerPage() {
   const contentFileRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [token] = useState(localStorage.getItem('token'));
-  const [popup, setPopup] = useState({
-    show: false,
-    message: "",
-    type: "success", // "success" | "error"
-  });
-
-
 
   // ── i18n ────────────────────────────────
-  const [lang, setLang] = useState(() => localStorage.getItem("lang") || "hu");
-  const toggleLang = () => {
-  const newLang = lang === "hu" ? "en" : "hu";
-  setLang(newLang);
-  localStorage.setItem("lang", newLang);
-};
-
+  const [lang, setLang] = useState("hu");
   const t = useMemo(() => {
     const hu = {
       brand: "SzeConnect",
@@ -86,6 +73,17 @@ export default function PostComposerPage() {
   const [errors, setErrors] = useState({});
   const [images, setImages] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  
+  // ADD THIS: Popup state
+  const [popup, setPopup] = useState({ show: false, type: "success", message: "" });
+
+  // ADD THIS: Function to show popup
+  const showPopup = (type, message) => {
+    setPopup({ show: true, type, message });
+    setTimeout(() => {
+      setPopup({ show: false, type, message: "" });
+    }, 3000);
+  };
 
   // Fetch groups from API
   useEffect(() => {
@@ -165,88 +163,51 @@ export default function PostComposerPage() {
     return Object.keys(e).length === 0;
   };
 
-const onSubmit = async (e) => {
-  e.preventDefault();
-  
-  if (!token) {
-    alert(t.loginRequired);
-    return;
-  }
-
-  if (!validate()) return;
-
-  try {
-    setSubmitting(true);
-
-    const payload = {
-      title: title.trim(),
-      content: content.trim(),
-      groupId: group.id
-    };
-
-    // The API will now handle FormData conversion automatically
-    const response = await api.createPost(payload, images, token);
+  // MODIFY THIS: onSubmit function
+  const onSubmit = async (e) => {
+    e.preventDefault();
     
-    if (response.success) {
-      // Clean up object URLs
-      images.forEach((img) => URL.revokeObjectURL(img.url));
+    if (!token) {
+      // CHANGE: Replace alert with popup
+      showPopup("error", t.loginRequired);
+      return;
+    }
 
-      setPopup({
-        show: true,
-        message: t.postSuccess,
-        type: "success",
-      });
+    if (!validate()) return;
 
-      // Hide popup and then navigate to the group page
-      setTimeout(() => {
-        setPopup({
-          show: false,
-          message: "",
-          type: "success",
-        });
-        navigate(`/groups/${group.id}`);
-      }, 1800);
-    } else {
-  setPopup({
-    show: true,
-    message: t.postError,
-    type: "error",
-  });
-  setTimeout(
-    () =>
-      setPopup({
-        show: false,
-        message: "",
-        type: "error",
-      }),
-    2200
-  );
-}
+    try {
+      setSubmitting(true);
 
+      const payload = {
+        title: title.trim(),
+        content: content.trim(),
+        groupId: group.id
+      };
 
-  } catch (error) {
-    console.error("Failed to create post:", error);
+      // The API will now handle FormData conversion automatically
+      const response = await api.createPost(payload, images, token);
+      
+      if (response.success) {
+        // CHANGE: Replace alert with popup
+        showPopup("success", t.postSuccess);
+        
+        // Clean up object URLs
+        images.forEach(img => URL.revokeObjectURL(img.url));
+        
+        // Navigate to the group page after popup is shown
+        setTimeout(() => {
+          navigate(`/groups/${group.id}`);
+        }, 1500);
+      }
+    } catch (error) {
+      console.error("Failed to create post:", error);
+      // CHANGE: Replace alert with popup
+      showPopup("error", `${t.postError}: ${error.message || "Unknown error"}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-    setPopup({
-      show: true,
-      message: t.postError,
-      type: "error",
-    });
-
-    setTimeout(
-      () =>
-        setPopup({
-          show: false,
-          message: "",
-          type: "error",
-        }),
-      2200
-    );
-  } finally {
-
-    setSubmitting(false);
-  }
-};
   // Render
   return (
     <div className="min-h-screen bg-[#FDFDFE] flex flex-col">
@@ -265,7 +226,7 @@ const onSubmit = async (e) => {
         {/* Desktop buttons */}
         <div className="hidden md:flex items-center gap-4">
           <button
-            onClick={toggleLang}
+            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
             className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
           >
             {lang === "hu" ? "EN" : "HU"}
@@ -310,7 +271,7 @@ const onSubmit = async (e) => {
             <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white text-[#1F3351] shadow-lg overflow-hidden border border-[#1F3351]/10">
               <button
                 onClick={() => {
-                  toggleLang();
+                  setLang(lang === "hu" ? "en" : "hu");
                   setMenuOpen(false);
                 }}
                 className="w-full text-left px-4 py-2 font-semibold hover:bg-[#EDF5FA]"
@@ -541,25 +502,23 @@ const onSubmit = async (e) => {
             </div>
           </form>
         </div>
-      </main>
-      
+        
+        {/* ADD THIS: The popup JSX */}
         {popup.show && (
-        <div
-          className={`
-            fixed top-8 left-1/2 -translate-x-1/2 z-[9999]
-            px-6 py-4 rounded-xl shadow-lg border
-            font-semibold transition-all duration-300
-            ${
-              popup.type === "success"
-                ? "bg-[#2A3F5B] text-white border-[#E1860E]"
-                : "bg-red-600 text-white border-red-300"
-            }
-          `}
-        >
-          {popup.message}
-        </div>
-      )}
-
+          <div
+            className={`
+              fixed top-8 left-1/2 -translate-x-1/2 z-[9999]
+              px-6 py-4 rounded-xl shadow-lg border
+              text-white font-semibold transition-all duration-300
+              ${popup.type === "success" 
+                ? "bg-[#2A3F5B] border-[#E1860E]" 
+                : "bg-red-600 border-red-300"}
+            `}
+          >
+            {popup.message}
+          </div>
+        )}
+      </main>
     </div>
   );
 }

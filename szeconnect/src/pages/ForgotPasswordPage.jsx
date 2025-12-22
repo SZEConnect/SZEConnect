@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { api } from "../lib/api.js"; // Adjust this path based on your structure
 
 export default function ForgotPasswordPage() {
   const [lang, setLang] = useState(() => localStorage.getItem("lang") || "hu");
@@ -7,12 +8,10 @@ export default function ForgotPasswordPage() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const toggleLang = () => {
-  const newLang = lang === "hu" ? "en" : "hu";
-  setLang(newLang);
-  localStorage.setItem("lang", newLang);
-};
-
-
+    const newLang = lang === "hu" ? "en" : "hu";
+    setLang(newLang);
+    localStorage.setItem("lang", newLang);
+  };
 
   const t = useMemo(() => {
     const hu = {
@@ -33,7 +32,7 @@ export default function ForgotPasswordPage() {
     const en = {
       title: "Forgot Password",
       lead:
-        "Type your registered e-mail and Neptun code. We’ll send a temporary password you can change later.",
+        "Type your registered e-mail and Neptun code. We'll send a temporary password you can change later.",
       emailLabel: "Email address",
       emailPh: "name@example.com",
       neptunLabel: "Neptun code",
@@ -49,21 +48,18 @@ export default function ForgotPasswordPage() {
   }, [lang]);
 
   const [email, setEmail] = useState("");
-  const [neptun, setNeptun] = useState("");
-  const [errors, setErrors] = useState({ email: "", neptun: "" });
+  const [errors, setErrors] = useState({ email: "" });
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState("");
 
   const isEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
-  const isNeptun = (v) => /^[A-Za-z0-9]{6}$/.test(v.trim());
 
   const validate = () => {
     const e = {
       email: isEmail(email) ? "" : t.errEmail,
-      neptun: isNeptun(neptun) ? "" : t.errNeptun,
     };
     setErrors(e);
-    return !e.email && !e.neptun;
+    return !e.email;
   };
 
   const onSubmit = async (e) => {
@@ -72,12 +68,38 @@ export default function ForgotPasswordPage() {
     if (!validate()) return;
 
     setSending(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setSending(false);
-    setNotice(t.ok);
+    
+    try {
+      console.log("🔄 Sending forgot password request for email:", email);
+      
+      // Test if api is loaded correctly
+      console.log("API object:", api);
+      console.log("Forgot password function exists?", typeof api?.forgotPassword);
+      
+      // Call the forgot password API endpoint
+      const data = await api.forgotPassword(email.trim().toLowerCase());
+
+      console.log("✅ Forgot password response:", data);
+
+      if (data.success) {
+        setNotice(t.ok);
+        setEmail("");
+        // Redirect to login after 2 seconds
+        setTimeout(() => {
+          navigate("/login");
+        }, 2000);
+      } else {
+        setNotice(data.error || "Error sending password reset email");
+      }
+    } catch (error) {
+      console.error("❌ Error in forgot password:", error);
+      setNotice(error.message || "Connection error. Please try again later.");
+    } finally {
+      setSending(false);
+    }
   };
 
-  const disabled = sending || !email || !neptun;
+  const disabled = sending || !email;
 
   return (
     <div className="min-h-screen bg-[#FDFDFE] flex flex-col">
@@ -96,12 +118,12 @@ export default function ForgotPasswordPage() {
             {lang === "hu" ? "EN" : "HU"}
           </button>
 
-          {/* <button
+          <button
             onClick={() => navigate("/login")}
             className="rounded-lg px-3 py-1.5 bg-[#2A3F5B] text-white font-semibold text-sm shadow hover:opacity-90"
           >
             {t.back}
-          </button> */}
+          </button>
         </div>
       </header>
 
@@ -120,31 +142,6 @@ export default function ForgotPasswordPage() {
             className="grid grid-cols-1 md:grid-cols-1 gap-x-10 gap-y-6"
             noValidate
           >
-
-            {/* Neptun
-            <div>
-              <label className="block font-semibold text-[#1F3351] mb-2">
-                {t.neptunLabel}
-              </label>
-              <input
-                value={neptun}
-                onChange={(e) => setNeptun(e.target.value.toUpperCase())}
-                onBlur={validate}
-                placeholder={t.neptunPh}
-                className={`w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4 bg-[#EDF5FA] text-[#1F3351] uppercase tracking-wider placeholder:text-[#1F3351]/70 ${
-                  errors.neptun
-                    ? "border-red-500 focus:ring-red-200"
-                    : "border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30"
-                }`}
-                maxLength={6}
-              />
-
-              {errors.neptun && (
-                <p className="text-red-600 text-sm mt-1">{errors.neptun}</p>
-              )}
-            </div> */}
-
-
             {/* Email */}
             <div className="w-full flex flex-col items-center">
               <label className="block font-semibold text-[#1F3351] mb-2 text-center">
@@ -171,8 +168,6 @@ export default function ForgotPasswordPage() {
               )}
             </div>
 
-
-
             {/* Submit and Notice */}
             <div className="md:col-span-2 flex flex-col items-center mt-6">
               <button
@@ -184,22 +179,22 @@ export default function ForgotPasswordPage() {
                     : "bg-[#E1860E] text-white hover:opacity-95"
                 }`}
               >
-                {sending ? "…" : t.send}
+                {sending ? "Sending..." : t.send}
               </button>
 
               {notice && (
-                <p className="mt-4 text-center text-[#1F3351] font-medium">
+                <p className={`mt-4 text-center font-medium ${notice.includes("success") ? "text-green-600" : "text-[#1F3351]"}`}>
                   {notice}
                 </p>
               )}
-{/* 
+
               <button
                 type="button"
                 onClick={() => navigate("/login")}
                 className="mt-6 rounded-xl bg-[#6C8EBF] text-white px-6 py-2 font-semibold shadow hover:opacity-95"
               >
                 {t.back}
-              </button> */}
+              </button>
             </div>
           </form>
         </div>
@@ -211,13 +206,62 @@ export default function ForgotPasswordPage() {
 /* ---------------- Icons ---------------- */
 function LogoMark({ className = "" }) {
   return (
-    <svg viewBox="0 0 400 400" className={className} role="img" aria-label="SzeConnect logo">
-      <circle cx="200" cy="200" r="185" fill="none" stroke="#FFFFFF" strokeWidth="30" />
-      <line x1="120" y1="206" x2="248" y2="125" stroke="#FFFFFF" strokeWidth="26" strokeLinecap="round" />
-      <line x1="120" y1="206" x2="248" y2="279" stroke="#FFFFFF" strokeWidth="26" strokeLinecap="round" />
-      <circle cx="120" cy="206" r="41" fill="#E1860E" stroke="#FFFFFF" strokeWidth="6" />
-      <circle cx="248" cy="125" r="41" fill="#E1860E" stroke="#FFFFFF" strokeWidth="6" />
-      <circle cx="248" cy="279" r="41" fill="#2A3F5B" stroke="#FFFFFF" strokeWidth="6" />
+    <svg
+      viewBox="0 0 400 400"
+      className={className}
+      role="img"
+      aria-label="SzeConnect logo"
+    >
+      <circle
+        cx="200"
+        cy="200"
+        r="185"
+        fill="none"
+        stroke="#FFFFFF"
+        strokeWidth="30"
+      />
+      <line
+        x1="120"
+        y1="206"
+        x2="248"
+        y2="125"
+        stroke="#FFFFFF"
+        strokeWidth="26"
+        strokeLinecap="round"
+      />
+      <line
+        x1="120"
+        y1="206"
+        x2="248"
+        y2="279"
+        stroke="#FFFFFF"
+        strokeWidth="26"
+        strokeLinecap="round"
+      />
+      <circle
+        cx="120"
+        cy="206"
+        r="41"
+        fill="#E1860E"
+        stroke="#FFFFFF"
+        strokeWidth="6"
+      />
+      <circle
+        cx="248"
+        cy="125"
+        r="41"
+        fill="#E1860E"
+        stroke="#FFFFFF"
+        strokeWidth="6"
+      />
+      <circle
+        cx="248"
+        cy="279"
+        r="41"
+        fill="#2A3F5B"
+        stroke="#FFFFFF"
+        strokeWidth="6"
+      />
     </svg>
   );
 }

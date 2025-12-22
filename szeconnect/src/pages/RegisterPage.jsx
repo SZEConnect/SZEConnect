@@ -3,20 +3,21 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 
 export default function RegisterPage() {
-  const [lang, setLang] = useState(() => localStorage.getItem("lang") || "hu");
+  const [lang, setLang] = useState("hu");
   const navigate = useNavigate();
   const onInfo = () => navigate("/info");
   const [menuOpen, setMenuOpen] = useState(false);
+  
+  // ADD THIS: Popup state
   const [popup, setPopup] = useState({ show: false, type: "success", message: "" });
 
+  // ADD THIS: Function to show popup
   const showPopup = (type, message) => {
-  setPopup({ show: true, type, message });
-  setTimeout(() => {
-    setPopup({ show: false, type, message: "" });
-  }, 3000);
-};
-
-
+    setPopup({ show: true, type, message });
+    setTimeout(() => {
+      setPopup({ show: false, type, message: "" });
+    }, 3000);
+  };
 
   const t = useMemo(() => {
     const hu = {
@@ -86,7 +87,7 @@ export default function RegisterPage() {
       birthYear: "Birth Year (optional)",
       gender: "Gender (optional)",
       profilePic: "Profile picture (optional)",
-      bio: "Information about yourself you’d like to share (optional)",
+      bio: "Information about yourself you'd like to share (optional)",
       accept: "I accept the Terms of Use",
       register: "Register",
       requiredMark: "*",
@@ -178,7 +179,7 @@ export default function RegisterPage() {
     [lang]
   );
 
-  // Programs / Majors (grouped & localized) – same as your original list
+  // Programs / Majors
   const programs = useMemo(() => {
     const hu = [
       { group: "Alapképzés – Agrár", options: [
@@ -312,7 +313,7 @@ export default function RegisterPage() {
         "Health Care Manager MSc","Obstetrics and Gynecology Sonography MSc","Health Psychology MSc","Nutrition Science MSc","Midwifery MSc",
       ]},
       { group: "Master – IT", options: ["Business Informatics MSc","Computer Engineering MSc","Software Engineering MSc"] },
-      { group: "Master – Humanities", options: ["Human Resource Counselling MA","Children’s Culture MA","Cultural Mediation MA"] },
+      { group: "Master – Humanities", options: ["Human Resource Counselling MA","Children's Culture MA","Cultural Mediation MA"] },
       { group: "Master – Engineering", options: [
         "ESG – Environmental, Social and Governance Specialist MSc","Architecture MSc","Mechanical Engineering MSc",
         "Infrastructure Civil Engineering MSc","Vehicle Engineering MSc","Transport Engineering MSc","Logistics Engineering MSc",
@@ -351,8 +352,8 @@ export default function RegisterPage() {
     const reEmail = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
     const reStrong = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
 
-    // if (!form.firstName.trim()) e.firstName = t.errors.firstName;
-    // if (!form.lastName.trim()) e.lastName = t.errors.lastName;
+    if (!form.firstName.trim()) e.firstName = t.errors.firstName;
+    if (!form.lastName.trim()) e.lastName = t.errors.lastName;
 
     if (!form.username) e.username = t.errors.required;
     else if (!reUser.test(form.username)) e.username = t.errors.username;
@@ -383,40 +384,7 @@ export default function RegisterPage() {
     return Object.keys(e).length === 0;
   };
 
- // ----- Submit -----
-
- const translateRegisterError = (errMessage) => {
-  if (lang === "hu") {
-    if (errMessage.includes("Username already exists"))
-      return "A felhasználónév már foglalt.";
-
-    if (errMessage.includes("Email already exists"))
-      return "Ez az email cím már regisztrálva van.";
-
-    if (
-      errMessage.includes("Neptun already registered") ||
-      errMessage.includes("Neptun code already in use")
-    )
-      return "Ezzel a Neptun-kóddal már van fiók.";
-
-    if (errMessage.includes("Invalid Neptun code"))
-      return "Érvénytelen Neptun-kód.";
-
-    if (errMessage.includes("Weak password"))
-      return "Gyenge jelszó. Kövesd a megadott szabályokat.";
-
-    if (errMessage.includes("Missing fields"))
-      return "Tölts ki minden kötelező mezőt.";
-
-    return "A regisztráció sikertelen volt.";
-  }
-
-  // English fallback
-  return errMessage || "Registration failed.";
-};
-
-
-
+  // ----- Submit -----
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
@@ -425,7 +393,6 @@ export default function RegisterPage() {
     const formData = new FormData();
 
     // 2. Append text fields
-    // Note: We trim strings here just like you did in the payload object
     formData.append("username", form.username.trim());
     formData.append("neptun", form.neptun.toUpperCase());
     formData.append("email", form.email.toLowerCase());
@@ -437,53 +404,43 @@ export default function RegisterPage() {
     // Combine names for the backend
     formData.append("fullName", `${form.firstName.trim()} ${form.lastName.trim()}`);
 
-    // Optional fields - only append if they have values
+    // Optional fields
     if (form.birthYear) formData.append("birthYear", form.birthYear);
     if (form.gender) formData.append("gender", form.gender);
     if (form.bio) formData.append("bio", form.bio);
 
     // 3. Append the File
-    // 'profileImage' must match uploadProfile.single('profileImage') in your backend!
     if (profileFile) {
       formData.append("profileImage", profileFile);
     }
 
     try {
       // 4. Send FormData to API
-      // Ensure your api.register function can handle FormData (see step 2 below)
-      await api.register(formData); 
+      const response = await api.register(formData);
       
+      // Save Token and ID immediately to Auto-Login
+      if (response.token) {
+        localStorage.setItem("token", response.token);
+        localStorage.setItem("userId", response.user.id);
+      }
+
+      // CHANGE THIS: Replace alert with popup
       showPopup(
         "success",
         lang === "hu" ? "Sikeres regisztráció!" : "Registration successful!"
       );
+      
+      // Navigate after popup is shown
       setTimeout(() => navigate("/interests"), 1500);
-
+      
     } catch (err) {
-      console.error("REGISTRATION ERROR:", err);
-
-      // Get backend error safely
-      const backendMessage =
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        err.message ||
-        "";
-
-      const translated = translateRegisterError(backendMessage);
-
-      showPopup("error", translated);
+      console.error(err);
+      
+      // CHANGE THIS: Replace alert with popup for errors too
+      const errorMessage = err.message || (lang === "hu" ? "Regisztráció sikertelen" : "Registration failed");
+      showPopup("error", errorMessage);
     }
-
-
   };
-
-
-  const toggleLang = () => {
-  const newLang = lang === "hu" ? "en" : "hu";
-  setLang(newLang);
-  localStorage.setItem("lang", newLang);
-};
-
 
   // ----- Render -----
   return (
@@ -495,14 +452,12 @@ export default function RegisterPage() {
           <span className="text-2xl font-bold">{t.brand}</span>
         </div>
         <div className="flex items-center gap-4">
-          {/* Language toggle (left) */}
           <button
-            onClick={toggleLang}
+            onClick={() => setLang(lang === "hu" ? "en" : "hu")}
             className="rounded-lg px-3 py-1.5 bg-[#E1860E] text-white font-semibold text-sm shadow hover:opacity-90"
           >
             {lang === "hu" ? "EN" : "HU"}
           </button>
-          {/* Info button (right) */}
           <button
             onClick={onInfo}
             className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-[#1F3351] font-bold text-lg shadow hover:shadow-lg hover:bg-[#f9f9f9] transition"
@@ -521,7 +476,7 @@ export default function RegisterPage() {
 
           <form onSubmit={handleSubmit} className="grid gap-8 md:grid-cols-2 xl:grid-cols-3 w-full">
             {/* First & Last Name */}
-            <Field label={t.firstName} error={errors.firstName}>
+            <Field label={`${t.firstName}${t.requiredMark}`} error={errors.firstName}>
               <input
                 className={inputCls(errors.firstName)}
                 value={form.firstName}
@@ -530,7 +485,7 @@ export default function RegisterPage() {
                 autoComplete="given-name"
               />
             </Field>
-            <Field label={t.lastName} error={errors.lastName}>
+            <Field label={`${t.lastName}${t.requiredMark}`} error={errors.lastName}>
               <input
                 className={inputCls(errors.lastName)}
                 value={form.lastName}
@@ -583,28 +538,26 @@ export default function RegisterPage() {
               </div>
             </Field>
 
-
             {/* Confirm */}
             <Field label={`${t.confirm}${t.requiredMark}`} error={errors.confirm}>
-            <div className="relative flex items-center">
-              <input
-                type={showConfirm ? "text" : "password"}
-                className={inputCls(errors.confirm) + " pr-10"}
-                value={form.confirm}
-                onChange={(e) => onChange("confirm", e.target.value)}
-                placeholder={t.placeholders.confirm}
-                autoComplete="new-password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirm(!showConfirm)}
-                className="absolute right-3 text-[#1F3351]/70 text-xl font-bold"
-              >
-                {showConfirm ? "◠" : "◉"}
-              </button>
-            </div>
-          </Field>
-
+              <div className="relative flex items-center">
+                <input
+                  type={showConfirm ? "text" : "password"}
+                  className={inputCls(errors.confirm) + " pr-10"}
+                  value={form.confirm}
+                  onChange={(e) => onChange("confirm", e.target.value)}
+                  placeholder={t.placeholders.confirm}
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm(!showConfirm)}
+                  className="absolute right-3 text-[#1F3351]/70 text-xl font-bold"
+                >
+                  {showConfirm ? "◠" : "◉"}
+                </button>
+              </div>
+            </Field>
 
             {/* Email */}
             <Field label={`${t.email}${t.requiredMark}`} error={errors.email}>
@@ -748,7 +701,6 @@ export default function RegisterPage() {
               >
                 {t.register}
               </button>
-
             </div>
 
             {/* Footer link */}
@@ -759,8 +711,8 @@ export default function RegisterPage() {
             </div>
           </form>
         </div>
-
-        {/* Custom popup */}
+        
+        {/* ADD THIS: The popup JSX */}
         {popup.show && (
           <div
             className={`
@@ -775,8 +727,6 @@ export default function RegisterPage() {
             {popup.message}
           </div>
         )}
-
-
       </main>
     </div>
   );
@@ -796,13 +746,12 @@ function Field({ label, error, full = false, children }) {
 function inputCls(hasError) {
   return [
     "mt-2 w-full rounded-xl border-2 px-4 py-3 text-base outline-none transition focus:ring-4",
-    "bg-[#EDF5FA]", // same light blue as LoginPage
+    "bg-[#EDF5FA]",
     hasError
       ? "border-red-500 focus:ring-red-200"
       : "border-[#1F3351]/30 focus:border-[#E1860E] focus:ring-[#E1860E]/30",
   ].join(" ");
 }
-
 
 function LogoShare({ className = "" }) {
   return (
@@ -816,5 +765,3 @@ function LogoShare({ className = "" }) {
     </svg>
   );
 }
-
-console.log('REACT_APP_API_URL:', process.env.REACT_APP_API_URL);
