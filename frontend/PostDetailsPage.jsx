@@ -16,8 +16,34 @@ export default function PostDetailsPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [token] = useState(localStorage.getItem('token'));
-    const [isFollowingGroup, setIsFollowingGroup] = useState(false);
+  const [isFollowingGroup, setIsFollowingGroup] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  
+  // ADD THIS: Popup state
+  const [popup, setPopup] = useState({ show: false, type: "success", message: "" });
+  
+  // ADD THIS: Function to show popup
+  const showPopup = (type, message) => {
+    setPopup({ show: true, type, message });
+    setTimeout(() => {
+      setPopup({ show: false, type, message: "" });
+    }, 3000);
+  };
+  
+  // ADD THESE STATES FOR REPORTING
+  const [reportLoading, setReportLoading] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportType, setReportType] = useState(''); // 'post', 'comment', 'reply'
+  const [reportTargetId, setReportTargetId] = useState(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reasons] = useState([
+    { id: 'spam', label: 'Spam' },
+    { id: 'harassment', label: 'Harassment or bullying' },
+    { id: 'hate', label: 'Hate speech' },
+    { id: 'inappropriate', label: 'Inappropriate content' },
+    { id: 'misinformation', label: 'Misinformation' },
+    { id: 'other', label: 'Other' }
+  ]);
 
   const t = useMemo(() => {
     const hu = {
@@ -33,6 +59,27 @@ export default function PostDetailsPage() {
       dislike: "Nem tetszik",
       createPost: "Új bejegyzés",
       newGroup: "Új csoport",
+      // ADD THESE TRANSLATIONS
+      report: "Jelentés",
+      reportPost: "Bejegyzés jelentése",
+      reportComment: "Hozzászólás jelentése",
+      reportContent: "Tartalom jelentése",
+      reportReason: "Jelentés oka",
+      cancel: "Mégse",
+      submitReport: "Jelentés küldése",
+      submitting: "Küldés...",
+      selectReason: "Válassz egy okot",
+      loginRequiredReport: "Bejelentkezés szükséges a jelentéshez",
+      // ADD POPUP TRANSLATIONS
+      reportSuccess: "Jelentés sikeresen elküldve!",
+      reportError: "Hiba történt a jelentés elküldésekor",
+      loginRequiredVote: "Bejelentkezés szükséges a szavazáshoz",
+      voteSuccess: "Szavazás sikeres!",
+      voteError: "Nem sikerült a szavazás",
+      commentSuccess: "Hozzászólás sikeresen elküldve!",
+      commentError: "Nem sikerült elküldeni a hozzászólást",
+      replySuccess: "Válasz sikeresen elküldve!",
+      replyError: "Nem sikerült elküldeni a választ"
     };
     const en = {
       brand: "SzeConnect",
@@ -47,157 +94,237 @@ export default function PostDetailsPage() {
       dislike: "Dislike",
       createPost: "New Post",
       newGroup: "New Group",
+      // ADD THESE TRANSLATIONS
+      report: "Report",
+      reportPost: "Report Post",
+      reportComment: "Report Comment",
+      reportContent: "Report Content",
+      reportReason: "Report Reason",
+      cancel: "Cancel",
+      submitReport: "Submit Report",
+      submitting: "Submitting...",
+      selectReason: "Select a reason",
+      loginRequiredReport: "Login required to report",
+      // ADD POPUP TRANSLATIONS
+      reportSuccess: "Report submitted successfully!",
+      reportError: "Error submitting report",
+      loginRequiredVote: "Login required to vote",
+      voteSuccess: "Vote successful!",
+      voteError: "Failed to vote",
+      commentSuccess: "Comment posted successfully!",
+      commentError: "Failed to post comment",
+      replySuccess: "Reply posted successfully!",
+      replyError: "Failed to post reply"
     };
     return lang === "hu" ? hu : en;
   }, [lang]);
 
   // Fetch post and comments from API
-useEffect(() => {
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      
-      // Fetch all posts to find the specific one
-      const postsResponse = await api.listPosts();
-      const foundPost = postsResponse.posts.find(p => p.id === parseInt(postId));
-      
-      if (foundPost) {
-        setPost(foundPost);
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
         
-        // Fetch likes for this post from the database
-        const likesResponse = await api.getLikes(postId);
-        if (likesResponse.success) {
-          setVotes(likesResponse.likes);
+        const postsResponse = await api.listPosts();
+        const foundPost = postsResponse.posts.find(p => p.id === parseInt(postId));
+        
+        if (foundPost) {
+          setPost(foundPost);
+          
+          const likesResponse = await api.getLikes(postId);
+          if (likesResponse.success) {
+            setVotes(likesResponse.likes);
+          }
+
+          if (token) {
+            try {
+              const followResponse = await api.checkFollowing(foundPost.groupId, token);
+              if (followResponse.success) {
+                setIsFollowingGroup(followResponse.following);
+              }
+            } catch (followError) {
+              console.error("Failed to check follow status:", followError);
+            }
+          }
         }
 
-        // ADD DEBUG LOGS FOR FOLLOW STATUS
-        console.log("🔄 Checking follow status for group:", foundPost.groupId);
-        console.log("🔄 User token exists:", !!token);
+        const commentsResponse = await api.getComments(postId);
+        setComments(commentsResponse.comments || []);
         
-        // Check if user is following the group
-        if (token) {
-          try {
-            const followResponse = await api.checkFollowing(foundPost.groupId, token);
-            console.log("📡 Follow API response:", followResponse);
-            
-            if (followResponse.success) {
-              console.log("✅ Setting isFollowingGroup to:", followResponse.following);
-              setIsFollowingGroup(followResponse.following);
-            } else {
-              console.log("❌ Follow check failed:", followResponse);
-            }
-          } catch (followError) {
-            console.error("🚨 Failed to check follow status:", followError);
-          }
-        } else {
-          console.log("🔒 No token, cannot check follow status");
-        }
+      } catch (error) {
+        console.error("Failed to fetch post data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [postId, token]);
+
+  // MODIFY THIS: ADD REPORT HANDLER FUNCTION
+  const handleReport = async () => {
+    if (!token) {
+      // CHANGE: Replace alert with popup
+      showPopup("error", t.loginRequiredReport);
+      return;
+    }
+
+    if (!reportReason.trim()) {
+      // CHANGE: Replace alert with popup
+      showPopup("error", t.selectReason);
+      return;
+    }
+
+    setReportLoading(true);
+    try {
+      let response;
+      
+      if (reportType === 'post') {
+        response = await api.reportPost(reportTargetId, reportReason, token);
+      } else if (reportType === 'comment' || reportType === 'reply') {
+        // Both comments and replies use the same endpoint
+        response = await api.reportComment(reportTargetId, reportReason, token);
       }
 
-      // Fetch comments
-      const commentsResponse = await api.getComments(postId);
-      setComments(commentsResponse.comments || []);
-      
+      if (response.success) {
+        // CHANGE: Replace alert with popup
+        showPopup("success", response.message);
+        
+        if (response.banned) {
+          console.log(`User has been banned for: ${response.banDuration}`);
+        }
+        
+        // Close modal and reset
+        setShowReportModal(false);
+        setReportReason('');
+        setReportType('');
+        setReportTargetId(null);
+      }
     } catch (error) {
-      console.error("Failed to fetch post data:", error);
+      console.error("Report error:", error);
+      // CHANGE: Replace alert with popup
+      showPopup("error", lang === "hu" 
+        ? "Hiba történt a jelentés elküldésekor" 
+        : "Error submitting report");
     } finally {
-      setLoading(false);
+      setReportLoading(false);
     }
   };
 
-  fetchData();
-}, [postId, token]);
+  // ADD REPORT MODAL COMPONENT
+  const ReportModal = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
+        <h3 className="text-xl font-bold text-[#1F3351] mb-4">
+          {t.reportContent}
+        </h3>
+        
+        <p className="text-gray-600 mb-4">
+          {t.reportReason}
+        </p>
+        
+        <div className="space-y-2 mb-6">
+          {reasons.map((reason) => (
+            <label 
+              key={reason.id}
+              className="flex items-center p-3 rounded-lg border-2 border-gray-200 hover:border-[#6C8EBF] cursor-pointer transition-colors"
+            >
+              <input
+                type="radio"
+                name="reportReason"
+                value={reason.label}
+                checked={reportReason === reason.label}
+                onChange={(e) => setReportReason(e.target.value)}
+                className="mr-3"
+              />
+              <span className="text-gray-800">{reason.label}</span>
+            </label>
+          ))}
+        </div>
+        
+        <div className="flex gap-3">
+          <button
+            onClick={() => {
+              setShowReportModal(false);
+              setReportReason('');
+              setReportType('');
+              setReportTargetId(null);
+            }}
+            className="flex-1 rounded-xl bg-gray-200 text-gray-700 font-semibold px-4 py-3 hover:bg-gray-300 transition"
+            disabled={reportLoading}
+          >
+            {t.cancel}
+          </button>
+          
+          <button
+            onClick={handleReport}
+            disabled={!reportReason.trim() || reportLoading}
+            className="flex-1 rounded-xl bg-[#6C8EBF] text-white font-semibold px-4 py-3 hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {reportLoading ? t.submitting : t.submitReport}
+          </button>
+        </div>
+        
+        <div className="mt-6 p-3 bg-blue-50 rounded-lg">
+          <p className="text-sm text-blue-800">
+            {lang === "hu" 
+              ? "⚠️ Több jelentés után a felhasználó figyelmeztetést kap. 3 figyelmeztetés után 2 órás kitiltás következik."
+              : "⚠️ Multiple reports may result in warnings. After 3 warnings, users receive a 2-hour ban."}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 
-// ADD THIS FUNCTION - Follow/Unfollow handler
-const handleFollowToggle = async () => {
-  console.log("🖱️ Follow button clicked!");
-  console.log("🔄 Current isFollowingGroup state:", isFollowingGroup);
-  console.log("🔑 Token exists:", !!token);
-  console.log("📝 Post groupId:", post?.groupId);
+  // MODIFY THIS: UPDATE THE EXISTING LIKE FUNCTIONS
+  const toggleUp = async () => {
+    if (!token) {
+      // CHANGE: Replace alert with popup
+      showPopup("error", t.loginRequiredVote);
+      return;
+    }
 
-  if (!token) {
-    alert(lang === "hu" ? "Bejelentkezés szükséges a csoport követéséhez" : "Login required to follow group");
-    return;
-  }
-
-  if (!post) {
-    console.log("❌ No post data available");
-    return;
-  }
-
-  setFollowLoading(true);
-  try {
-    if (isFollowingGroup) {
-      console.log("➖ UNFOLLOWING group:", post.groupId);
-      const response = await api.leaveGroup(post.groupId, token);
-      console.log("📡 Unfollow API response:", response);
+    try {
+      const newVoteType = votes.my === 1 ? 0 : 1;
+      const response = await api.likePost(postId, newVoteType, token);
       
       if (response.success) {
-        setIsFollowingGroup(false);
-        console.log("✅ Successfully unfollowed, state updated to: false");
-      } else {
-        console.log("❌ Unfollow API returned success: false");
+        setVotes(response.likes);
+        // ADD: Show success popup
+        showPopup("success", t.voteSuccess);
       }
-    } else {
-      console.log("➕ FOLLOWING group:", post.groupId);
-      const response = await api.joinGroup(post.groupId, token);
-      console.log("📡 Follow API response:", response);
+    } catch (error) {
+      console.error("Failed to update like:", error);
+      // CHANGE: Replace alert with popup
+      showPopup("error", t.voteError);
+    }
+  };
+
+  // MODIFY THIS
+  const toggleDown = async () => {
+    if (!token) {
+      // CHANGE: Replace alert with popup
+      showPopup("error", t.loginRequiredVote);
+      return;
+    }
+
+    try {
+      const newVoteType = votes.my === -1 ? 0 : -1;
+      const response = await api.likePost(postId, newVoteType, token);
       
       if (response.success) {
-        setIsFollowingGroup(true);
-        console.log("✅ Successfully followed, state updated to: true");
-      } else {
-        console.log("❌ Follow API returned success: false");
+        setVotes(response.likes);
+        // ADD: Show success popup
+        showPopup("success", t.voteSuccess);
       }
+    } catch (error) {
+      console.error("Failed to update dislike:", error);
+      // CHANGE: Replace alert with popup
+      showPopup("error", t.voteError);
     }
-  } catch (error) {
-    console.error("🚨 API call failed:", error);
-    alert(lang === "hu" ? "Nem sikerült a művelet" : "Failed to perform action");
-  } finally {
-    setFollowLoading(false);
-    console.log("🏁 Follow loading state set to false");
-  }
-};
+  };
 
-// UPDATE THESE LIKE FUNCTIONS
-const toggleUp = async () => {
-  if (!token) {
-    alert(lang === "hu" ? "Bejelentkezés szükséges a szavazáshoz" : "Login required to vote");
-    return;
-  }
-
-  try {
-    const newVoteType = votes.my === 1 ? 0 : 1;
-    const response = await api.likePost(postId, newVoteType, token);
-    
-    if (response.success) {
-      setVotes(response.likes);
-    }
-  } catch (error) {
-    console.error("Failed to update like:", error);
-    alert(lang === "hu" ? "Nem sikerült a szavazás" : "Failed to vote");
-  }
-};
-
-const toggleDown = async () => {
-  if (!token) {
-    alert(lang === "hu" ? "Bejelentkezés szükséges a szavazáshoz" : "Login required to vote");
-    return;
-  }
-
-  try {
-    const newVoteType = votes.my === -1 ? 0 : -1;
-    const response = await api.likePost(postId, newVoteType, token);
-    
-    if (response.success) {
-      setVotes(response.likes);
-    }
-  } catch (error) {
-    console.error("Failed to update dislike:", error);
-    alert(lang === "hu" ? "Nem sikerült a szavazás" : "Failed to vote");
-  }
-};
-
+  // MODIFY THIS
   const submitComment = async (e) => {
     e.preventDefault();
     if (!draft.trim() || !post || !token) return;
@@ -208,13 +335,17 @@ const toggleDown = async () => {
       if (response.success) {
         setComments(prev => [response.comment, ...prev]);
         setDraft("");
+        // ADD: Show success popup
+        showPopup("success", t.commentSuccess);
       }
     } catch (error) {
       console.error("Failed to submit comment:", error);
-      alert(lang === "hu" ? "Nem sikerült elküldeni a hozzászólást" : "Failed to post comment");
+      // CHANGE: Replace alert with popup
+      showPopup("error", t.commentError);
     }
   };
 
+  // MODIFY THIS
   const submitReply = async (commentId) => {
     const text = replyDrafts[commentId]?.trim();
     if (!text || !token) return;
@@ -235,10 +366,13 @@ const toggleDown = async () => {
         );
 
         setReplyDrafts(prev => ({ ...prev, [commentId]: "" }));
+        // ADD: Show success popup
+        showPopup("success", t.replySuccess);
       }
     } catch (error) {
       console.error("Failed to submit reply:", error);
-      alert(lang === "hu" ? "Nem sikerült elküldeni a választ" : "Failed to post reply");
+      // CHANGE: Replace alert with popup
+      showPopup("error", t.replyError);
     }
   };
 
@@ -258,7 +392,23 @@ const toggleDown = async () => {
 
   return (
     <div className="min-h-screen bg-[#FAFBFD] flex flex-col">
-      {/* HEADER */}
+      {/* ADD THE POPUP COMPONENT HERE */}
+      {popup.show && (
+        <div
+          className={`
+            fixed top-8 left-1/2 -translate-x-1/2 z-[9999]
+            px-6 py-4 rounded-xl shadow-lg border
+            text-white font-semibold transition-all duration-300
+            ${popup.type === "success" 
+              ? "bg-[#2A3F5B] border-[#E1860E]" 
+              : "bg-red-600 border-red-300"}
+          `}
+        >
+          {popup.message}
+        </div>
+      )}
+
+      {/* HEADER (keep as is) */}
       <header className="flex items-center justify-between px-4 sm:px-6 md:px-10 py-4 shadow-md bg-[#6C8EBF] text-white sticky top-0 z-50">
         {/* Logo + Brand */}
         <button
@@ -431,24 +581,26 @@ const toggleDown = async () => {
                   <span className="font-semibold text-sm">{votes.down}</span>
                 </button>
                 
-                {/* REPORT POST BUTTON */}
+                {/* UPDATE THIS REPORT POST BUTTON */}
                 <button
-                  onClick={() => alert(lang === "hu" ? "Bejegyzés jelentve" : "Post reported")}
+                  onClick={() => {
+                    setReportType('post');
+                    setReportTargetId(post.id);
+                    setShowReportModal(true);
+                  }}
                   className="rounded-lg bg-[#6C8EBF] text-white px-4 py-2 text-sm font-semibold shadow hover:opacity-90"
                 >
-                  {lang === "hu" ? "Bejegyzés jelentése" : "Report Post"}
+                  {t.reportPost}
                 </button>
               </div>
             </div>
-
-
 
             {/* Post content */}
             <div className="border border-[#C9D6E2] rounded-xl bg-white p-4 text-[#1F3351] leading-relaxed whitespace-pre-wrap">
               {post.content}
             </div>
 
-            {/* IMAGE DISPLAY SECTION - ADD THIS */}
+            {/* IMAGE DISPLAY SECTION */}
             {post.images && post.images.length > 0 && (
               <div className="mt-4">
                 <div className="flex flex-wrap gap-3 justify-center">
@@ -479,7 +631,6 @@ const toggleDown = async () => {
                 </p>
               </div>
             )}
-
           </article>
 
           {/* COMMENTS */}
@@ -546,12 +697,16 @@ const toggleDown = async () => {
                         </div>
                       </div>
 
-                      {/* REPORT COMMENT BUTTON */}
+                      {/* UPDATE THIS COMMENT REPORT BUTTON */}
                       <button
-                        onClick={() => alert(lang === "hu" ? "Hozzászólás jelentve" : "Comment reported")}
+                        onClick={() => {
+                          setReportType('comment');
+                          setReportTargetId(comment.id);
+                          setShowReportModal(true);
+                        }}
                         className="rounded-lg bg-[#6C8EBF] text-white px-4 py-2 text-sm font-semibold shadow hover:opacity-90"
                       >
-                        {lang === "hu" ? "Jelentés" : "Report"}
+                        {t.report}
                       </button>
                     </header>
 
@@ -618,7 +773,7 @@ const toggleDown = async () => {
                               key={reply.id}
                               className="bg-white rounded-xl px-3 py-2"
                             >
-                              {/* Reply header with REPORT */}
+                              {/* Reply header - UPDATE THE REPORT BUTTON */}
                               <div className="flex items-start justify-between">
                                 <div>
                                   <div className="text-sm font-semibold text-[#1F3351]">
@@ -629,12 +784,16 @@ const toggleDown = async () => {
                                   </div>
                                 </div>
 
-                                {/* REPORT REPLY BUTTON */}
+                                {/* UPDATE THIS REPLY REPORT BUTTON */}
                                 <button
-                                  onClick={() => alert(lang === "hu" ? "Válasz jelentve" : "Reply reported")}
+                                  onClick={() => {
+                                    setReportType('reply');
+                                    setReportTargetId(reply.id);
+                                    setShowReportModal(true);
+                                  }}
                                   className="rounded-lg bg-[#6C8EBF] text-white px-4 py-2 text-sm font-semibold shadow hover:opacity-90"
                                 >
-                                  {lang === "hu" ? "Jelentés" : "Report"}
+                                  {t.report}
                                 </button>
                               </div>
 
@@ -708,11 +867,14 @@ const toggleDown = async () => {
           )}
         </button>
       </div>
+
+      {/* ADD THE REPORT MODAL */}
+      {showReportModal && <ReportModal />}
     </div>
   );
 }
 
-/* --------------- Icons --------------- */
+/* --------------- Icons (keep as is) --------------- */
 
 function LogoShare({ className = "" }) {
   return (
@@ -802,7 +964,7 @@ function ThumbDown({ className = "", stroke = "#1F3351" }) {
   );
 }
 
-/* ---------------- Skeleton ---------------- */
+/* ---------------- Skeleton (keep as is) ---------------- */
 
 function Skeleton() {
   return (
