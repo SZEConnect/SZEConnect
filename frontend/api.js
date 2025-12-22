@@ -1,110 +1,216 @@
-// src/lib/api.js
+// src/lib/api.js - FRONTEND ONLY - No backend code here!
 const BASE_URL = process.env.REACT_APP_API_URL || "https://szeconnect.onrender.com";
 
-async function request(path, { method = "GET", body, token, formData = false } = {}) {
+async function request(path, { method = "GET", body, token, isFormData = false } = {}) {
   const headers = {};
-  
-  // Only set Content-Type for JSON, not for FormData (browser sets boundary automatically)
-  if (!formData) {
+  let requestBody = body;
+
+  // IMPORTANT: For FormData, let the browser set the Content-Type with boundary
+  // For JSON, set Content-Type and stringify
+  if (!isFormData) {
     headers["Content-Type"] = "application/json";
+    if (body && typeof body !== 'string') {
+      requestBody = JSON.stringify(body);
+    }
   }
   
-  // Add authorization header if token exists
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers,
-    // If formData is true, send body as-is. Otherwise, JSON.stringify it.
-    body: formData ? body : (body ? JSON.stringify(body) : undefined),
+  console.log(`📤 API Request: ${method} ${path}`, {
+    isFormData,
+    hasToken: !!token,
+    bodyType: body?.constructor?.name,
+    headers
   });
 
-  const isJson = res.headers.get("content-type")?.includes("application/json");
-  const data = isJson ? await res.json() : null;
+  try {
+    const res = await fetch(`${BASE_URL}${path}`, {
+      method,
+      headers,
+      body: requestBody
+    });
 
-  if (!res.ok) {
-    const msg = data?.message || data?.error || `HTTP ${res.status}`;
-    throw new Error(msg);
+    // Handle non-JSON responses
+    const contentType = res.headers.get("content-type");
+    const isJson = contentType && contentType.includes("application/json");
+    
+    let data;
+    if (isJson) {
+      data = await res.json();
+    } else if (res.status === 204) { // No content
+      data = null;
+    } else {
+      const text = await res.text();
+      data = { message: text };
+    }
+
+    console.log(`📥 API Response: ${path}`, {
+      status: res.status,
+      ok: res.ok,
+      contentType,
+      data
+    });
+
+    if (!res.ok) {
+      const msg = data?.message || data?.error || `HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+    return data;
+  } catch (error) {
+    console.error(`❌ API Request Failed: ${method} ${path}`, error);
+    throw error;
   }
-  return data;
 }
 
 export const api = {
-  // ✅ UPDATED: Automatically detects if payload is FormData (has image) or JSON
-  register: (payload) => request("/register", { 
+  // Auth & User
+  register: (payload) => {
+    // Handle both FormData and JSON
+    const isFormData = payload instanceof FormData;
+    return request("/register", { 
+      method: "POST", 
+      body: payload,
+      isFormData
+    });
+  },
+  
+  login: (neptun, password) => request("/login", { 
     method: "POST", 
-    body: payload,
-    formData: payload instanceof FormData 
+    body: { neptun, password }
   }),
 
-  login: (neptun, password) => request("/login", { method: "POST", body: { neptun, password } }),
+  forgotPassword: (email) => request("/forgot-password", {
+    method: "POST",
+    body: { email }
+  }),
+  
   profile: (token) => request("/profile", { token }),
+  
+  updateProfile: (formData, token) => {
+    console.log("🟡 API.updateProfile called!");
+    console.log("FormData is FormData?", formData instanceof FormData);
+    console.log("Token length:", token?.length);
+    
+    // Log all FormData entries
+    if (formData instanceof FormData) {
+      console.log("FormData entries:");
+      for (let [key, value] of formData.entries()) {
+        if (key === 'profileImage') {
+          console.log(`  ${key}:`, value.name, `(${value.size} bytes)`);
+        } else {
+          console.log(`  ${key}:`, value);
+        }
+      }
+    }
+    
+    return request("/profile", {
+      method: "PUT",
+      body: formData,
+      token,
+      isFormData: true
+    });
+  },
+  
+  // Test endpoint for debugging
+  testUpdate: (data, token) => request("/test-profile", {
+    method: "PUT",
+    body: data,
+    token
+  }),
+  
+  // Users
   listUsers: () => request("/users"),
-  listGroups: () => request("/groups"),
-  listPosts: () => request("/posts"),
-  getComments: (postId) => request(`/posts/${postId}/comments`),
-  addComment: (postId, commentData, token) => request(`/posts/${postId}/comments`, { 
+  getUserProfile: (userId, token) => request(`/users/${userId}`, { token }),
+  getUserPosts: (userId, token) => request(`/users/${userId}/posts`, { token }),
+
+  // Groups
+  listGroups: (token) => request("/groups", { token }),
+  joinGroup: (groupId, token) => request(`/groups/${groupId}/join`, { 
     method: "POST", 
-    body: commentData,
     token 
   }),
+  leaveGroup: (groupId, token) => request(`/groups/${groupId}/leave`, { 
+    method: "POST", 
+    token 
+  }),
+  checkFollowing: (groupId, token) => request(`/groups/${groupId}/following`, { token }),
+  searchGroups: (query) => request(`/search/groups?q=${encodeURIComponent(query)}`),
+ 
+  createGroup: (groupData, token) => {
+    const isFormData = groupData instanceof FormData;
+    return request("/groups", { 
+      method: "POST", 
+      body: groupData, 
+      token,
+      isFormData
+    });
+  },
 
-  // Handle both FormData (with images) and regular JSON for posts
+  // Posts & Search
+  listPosts: (token) => request("/posts", { token }),
+  searchUsers: (query) => request(`/search/users?q=${encodeURIComponent(query)}`),
+
+  // Create Post
   createPost: (postData, images, token) => {
     if (images && images.length > 0) {
-      // Use FormData for image uploads
       const formData = new FormData();
       formData.append('title', postData.title);
       formData.append('content', postData.content || '');
-      formData.append('groupId', postData.groupId);
+      if (postData.groupId) {
+        formData.append('groupId', postData.groupId);
+      }
       
-      // Append each image file
       images.forEach((image) => {
         formData.append('images', image.file);
       });
 
       return request("/posts", { 
         method: "POST", 
-        body: formData,
-        token,
-        formData: true
+        body: formData, 
+        token, 
+        isFormData: true
       });
     } else {
-      // Use regular JSON for text-only posts
       return request("/posts", { 
         method: "POST", 
-        body: postData,
+        body: postData, 
         token 
       });
     }
   },
 
-  joinGroup: (groupId, token) => request(`/groups/${groupId}/join`, { 
-    method: "POST",
+  // Interactions
+  getComments: (postId) => request(`/posts/${postId}/comments`),
+  addComment: (postId, commentData, token) => request(`/posts/${postId}/comments`, { 
+    method: "POST", 
+    body: commentData, 
     token 
   }),
-  leaveGroup: (groupId, token) => request(`/groups/${groupId}/leave`, { 
-    method: "POST",
-    token 
-  }),
-
-  checkFollowing: (groupId, token) => request(`/groups/${groupId}/following`, { token }),
-
-  // Like functions
   getLikes: (postId) => request(`/posts/${postId}/likes`),
-  
   likePost: (postId, likeType, token) => request(`/posts/${postId}/like`, { 
     method: "POST", 
-    body: { likeType },
+    body: { likeType }, 
     token 
   }),
-  searchGroups: (query) => request(`/search/groups?q=${encodeURIComponent(query)}`),
-  searchUsers: (query) => request(`/search/users?q=${encodeURIComponent(query)}`),
+
+  // REPORTING FUNCTIONS
+  reportPost: (postId, reason, token) => request(`/posts/${postId}/report`, {
+    method: "POST",
+    body: { reason },
+    token
+  }),
+
+  reportComment: (commentId, reason, token) => request(`/comments/${commentId}/report`, {
+    method: "POST",
+    body: { reason },
+    token
+  }),
+
+  checkBanStatus: (userId, token) => request(`/check-ban/${userId}`, { token }),
   
-  ggetUserProfile: (userId, token) => {
-  console.log("🔧 getUserProfile called with:", { userId, hasToken: !!token });
-  return request(`/users/${userId}`, { token });
-},
+  getUserWarnings: (userId, token) => request(`/users/${userId}/warnings`, { token }),
 };
+
+// THAT'S IT! NO BACKEND CODE BELOW THIS LINE
